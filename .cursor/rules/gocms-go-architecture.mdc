@@ -1,0 +1,17 @@
+---
+description: Go architecture conventions for GoCMS implementation work
+globs: **/*.go
+alwaysApply: false
+---
+
+# GoCMS Go Architecture
+
+- Keep domain packages independent from HTTP, storage drivers, rendering, sessions, and background workers.
+- Pass `context.Context` through request, job, service, and storage boundaries.
+- Prefer typed constants for stable identifiers: content kinds, statuses, capabilities, hook IDs, plugin states, and template roles.
+- Keep delivery adapters thin: parse input, authenticate, call services, map results/errors.
+- Do not let REST, GraphQL, admin, CLI, or plugin code query storage directly when an application service owns the workflow.
+- Define repository interfaces near the services that consume them; keep concrete storage implementations behind infrastructure adapters.
+- Avoid hidden mutable globals and package init side effects; wire dependencies in the composition root.
+- Return classified errors that can map cleanly to REST, GraphQL, admin, CLI, and job failure outputs.
+- Comments in code must be written in English.

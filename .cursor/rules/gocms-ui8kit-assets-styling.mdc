@@ -1,0 +1,18 @@
+---
+description: UI8Kit runtime assets, styling, and ui8px policy for GoCMS
+globs: **/*.templ,**/*.css,package.json,web/static/**/*,.ui8px/policy/*.json
+alwaysApply: false
+---
+
+# GoCMS UI Assets And Styling
+
+- Treat generated runtime JS, generated CSS, and generated template output as build artifacts; regenerate them through scripts instead of hand-editing.
+- Keep UI8Kit runtime JS subsetted to the ARIA patterns actually rendered by the admin UI.
+- Do not use full CDN bundles for app-level admin behavior.
+- Admin JavaScript must be progressive enhancement; core authorization, validation, CSRF, and publish/plugin state must be enforced server-side.
+- Use explicit static utility classes that pass ui8px policy; do not hide required classes in runtime-only strings or broad safelists.
+- Use semantic token classes for reusable UI colors; avoid raw palette utilities such as `bg-blue-500`, `text-slate-700`, or `border-red-500`.
+- Do not write custom CSS declarations in GoCMS app selectors. App-owned semantic classes MUST be composed with `@apply` only.
+- Keep selector bodies reviewable: comments and `@apply` are allowed; raw declarations such as `width:`, `color:`, `background:`, `border:`, or `position:` are not allowed in app-owned CSS.
+- Repeated utility compositions should become UI8Kit variants, local elements, local blocks, or reviewed semantic patterns.
+- Conformance tests should use `data-gocms-*` markers and accessible roles/names, not visual class names.

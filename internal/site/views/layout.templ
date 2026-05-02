@@ -1,0 +1,79 @@
+package views
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+	"github.com/fastygo/framework/pkg/app"
+	ui8layout "github.com/fastygo/ui8kit/layout"
+	"github.com/fastygo/ui8kit/ui"
+)
+
+templ AdminLayout(data LayoutData, body templpkg.Component) {
+	@ui8layout.Shell(ui8layout.ShellProps{
+		Title:          data.Title,
+		Lang:           data.Lang,
+		BrandName:      data.Brand,
+		Active:         data.Active,
+		NavItems:       shellNavItems(data.NavItems),
+		CSSPath:        cssPath(data.Assets),
+		ThemeJSPath:    themeJSPath(data.Assets),
+		AppJSPath:      appJSPath(data.Assets),
+		HeaderTrailing: elements.AccountActions(data.Account),
+		ThemeToggle: ui8layout.ThemeToggleProps{
+			Label:              "Theme",
+			SwitchToDarkLabel:  "Switch to dark mode",
+			SwitchToLightLabel: "Switch to light mode",
+		},
+	}) {
+		@body
+	}
+}
+
+templ Screen(data ScreenData) {
+	@AdminLayout(data.Layout, screenBody(data))
+}
+
+templ screenBody(data ScreenData) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-admin-screen",
+		Attrs: templpkg.Attributes{"data-gocms-screen": data.Screen},
+	}) {
+		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
+			@ui.Stack(ui.StackProps{}) {
+				@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+				@elements.FieldHelp(data.Description)
+			}
+			@elements.ActionRow(data.Actions)
+		}
+		@data.Body
+	}
+}
+
+func shellNavItems(items []app.NavItem) []ui8layout.NavItem {
+	mapped := make([]ui8layout.NavItem, len(items))
+	for i, item := range items {
+		mapped[i] = ui8layout.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon}
+	}
+	return mapped
+}
+
+func cssPath(paths AssetPaths) string {
+	if paths.CSS != "" {
+		return paths.CSS
+	}
+	return "/static/css/app.css"
+}
+
+func themeJSPath(paths AssetPaths) string {
+	if paths.ThemeJS != "" {
+		return paths.ThemeJS
+	}
+	return "/static/js/theme.js"
+}
+
+func appJSPath(paths AssetPaths) string {
+	if paths.AppJS != "" {
+		return paths.AppJS
+	}
+	return "/static/js/ui8kit.js"
+}

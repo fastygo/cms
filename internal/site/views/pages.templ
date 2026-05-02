@@ -1,0 +1,82 @@
+package views
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/site/ui/blocks"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+)
+
+templ LoginPage(data LoginPageData) {
+	@blocks.AuthDocument(blocks.AuthDocumentProps{
+		Title: data.Title,
+		Lang:  "en",
+	}) {
+		@elements.MarkerMain(elements.MarkerProps{
+			Class: "gocms-login-shell",
+			Attrs: templpkg.Attributes{"data-gocms-screen": "login"},
+		}) {
+			@blocks.LoginPanel(blocks.LoginPanelData{
+				Title:       data.Title,
+				Subtitle:    data.Subtitle,
+				Error:       data.Error,
+				ReturnTo:    data.ReturnTo,
+				ActionToken: data.ActionToken,
+			})
+		}
+	}
+}
+
+templ DashboardPage(data DashboardData) {
+	@Screen(ScreenData{
+		Layout: data.Layout,
+		Screen: "dashboard",
+		Title: "Dashboard",
+		Description: "Manage GoCMS content, taxonomies, media, users, and headless delivery.",
+		Body: blocks.AdminDashboardCards(data.Cards),
+	})
+}
+
+templ ContentListPage(data ContentListPageData) {
+	@Screen(ScreenData{
+		Layout: data.Layout,
+		Screen: data.Screen,
+		Title: data.Table.Title,
+		Description: data.Table.Description,
+		Body: blocks.ContentTable(data.Table),
+	})
+}
+
+templ ContentEditPage(data ContentEditPageData) {
+	@Screen(ScreenData{
+		Layout: data.Layout,
+		Screen: data.Screen,
+		Title: data.Editor.Title,
+		Description: data.Editor.Description,
+		Body: blocks.ContentEditor(data.Editor),
+	})
+}
+
+templ SimpleListPage(data SimpleListPageData) {
+	@Screen(ScreenData{
+		Layout: data.Layout,
+		Screen: data.Screen,
+		Title: data.List.Title,
+		Description: data.List.Description,
+		Actions: data.List.Actions,
+		Body: blocks.SimpleList(data.List),
+	})
+}
+
+templ SettingsPage(data SettingsPageData) {
+	@Screen(ScreenData{
+		Layout: data.Layout,
+		Screen: data.Screen,
+		Title: data.Form.Title,
+		Description: data.Form.Description,
+		Body: blocks.SettingsCard(data.Form),
+	})
+}
+
+templ PlaceholderPanel(title string, description string, actions []elements.Action) {
+	@blocks.PlaceholderPanel(title, description, actions)
+}

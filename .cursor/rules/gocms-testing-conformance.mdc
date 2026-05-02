@@ -1,0 +1,16 @@
+---
+description: Testing and conformance expectations for GoCMS
+globs: **/*_test.go,go-codex/en/08-conformance-tests.md,go-stack/en/08-testing-and-conformance-adapters.md,go-ui8kit/en/07-accessibility-and-conformance.md
+alwaysApply: false
+---
+
+# GoCMS Testing And Conformance
+
+- Test observable compatibility behavior through required URLs, resource shapes, capabilities, and state transitions.
+- Do not make conformance tests depend on internal package layout, database schema, CSS classes, generated filenames, or a specific storage driver.
+- Cover unauthenticated, admin, editor, and low-privilege actors where authorization matters.
+- Verify drafts/private metadata cannot leak through REST, GraphQL, admin previews, search, theme rendering, or plugin routes.
+- For admin UI tests, prefer accessible names, roles, and stable `data-gocms-*` markers.
+- Plugin tests must cover install, activation failure rollback, active route/hook visibility, deactivation, uninstall policy, and capability enforcement.
+- Theme tests must cover manifest validation, activation rollback, template resolution, slot registration, and private content protection.
+- Background job tests should cover idempotency, cancellation, retries, plugin deactivation behavior, and derived-output visibility.

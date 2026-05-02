@@ -1,0 +1,18 @@
+---
+description: UI8Kit-first admin UI composition rules for GoCMS
+globs: **/*.templ,internal/site/ui/**/*.go,internal/site/views/**/*.go
+alwaysApply: false
+---
+
+# GoCMS UI8Kit Admin UI
+
+- Compose admin UI with UI8Kit primitives/composites first, then local reusable `elements`, then local reusable `blocks`, then page views.
+- Do not write raw/custom HTML tags in app `.templ` files. UI8Kit primitives/composites, local elements, local blocks, and `layout.Shell` are the tag suppliers.
+- If a required semantic tag or attribute hook is missing, extend UI8Kit in the correct primitive/composite layer instead of bypassing it in app templates.
+- Use `Block` only for top-level sections, landmarks, and public anchors; use `Box`, `Stack`, `Group`, `Grid`, `Container`, `Text`, and `Title` internally.
+- Do not nest `Block` inside `Block`; promote nested public anchors to sibling top-level blocks.
+- Use dedicated primitives for strict content models: tables, lists, description lists, media, disclosure, and forms.
+- Preserve UI8Kit ARIA/data hooks for dialog, sheet, alert dialog, tabs, accordion, combobox, tooltip, and disclosure patterns.
+- Put reusable widgets in `internal/site/ui/elements`; put reusable top-level admin sections in `internal/site/ui/blocks`.
+- Keep reusable UI props data-focused; do not reach into request, session, storage, or services from reusable UI packages.
+- Use stable `data-gocms-*` markers for conformance tests instead of CSS selectors.

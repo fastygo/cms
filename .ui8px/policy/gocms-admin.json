@@ -1,0 +1,12 @@
+{
+  "allowed": [
+    "gocms-*"
+  ],
+  "denied": [
+    "bg-blue-*",
+    "text-slate-*",
+    "border-red-*",
+    "from-purple-*",
+    "ring-zinc-*"
+  ]
+}

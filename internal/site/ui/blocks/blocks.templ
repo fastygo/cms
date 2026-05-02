@@ -1,0 +1,222 @@
+package blocks
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+	"github.com/fastygo/ui8kit/components"
+	"github.com/fastygo/ui8kit/ui"
+)
+
+templ AdminDashboardCards(cards []StatCard) {
+	@elements.MarkerDiv(elements.MarkerProps{
+		Class: "ui-grid grid-cols-1 gocms-dashboard-grid",
+		Attrs: templpkg.Attributes{"data-gocms-block": "dashboard-cards"},
+	}) {
+		for _, card := range cards {
+			@components.Card(components.CardProps{}) {
+				@components.CardHeader(components.CardHeaderProps{}) {
+					@components.CardTitle(components.CardTitleProps{Order: 2}, card.Label)
+				}
+				@components.CardContent(components.CardContentProps{}) {
+					@ui.Title(ui.TitleProps{Order: 3, FontSize: "3xl"}, card.Value)
+					if card.Href != "" {
+						@ui.Button(ui.ButtonProps{Href: card.Href, Variant: "link"}, "Open")
+					}
+				}
+			}
+		}
+	}
+}
+
+templ LoginPanel(data LoginPanelData) {
+	@components.Card(components.CardProps{Class: "gocms-login-card"}) {
+		@components.CardHeader(components.CardHeaderProps{}) {
+			@components.CardTitle(components.CardTitleProps{Order: 1}, data.Title)
+			@components.CardDescription(components.CardDescriptionProps{}, data.Subtitle)
+		}
+		@components.CardContent(components.CardContentProps{}) {
+			if data.Error != "" {
+				@ui.Text(ui.TextProps{TextColor: "destructive", FontSize: "sm"}, data.Error)
+			}
+			@ui.Form(ui.FormProps{Action: "/go-login", Method: "post", Attrs: templpkg.Attributes{"data-gocms-action": "login"}}) {
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.ActionToken})
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "return_to", Value: data.ReturnTo})
+				@ui.Field(ui.FieldProps{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true, Autocomplete: "username"})
+				@ui.Field(ui.FieldProps{ID: "password", Name: "password", Label: "Password", Type: "password", Required: true, Autocomplete: "current-password"})
+				@ui.Button(ui.ButtonProps{Type: "submit"}, "Sign in")
+			}
+		}
+	}
+}
+
+templ PlaceholderPanel(title string, description string, actions []elements.Action) {
+	@components.Card(components.CardProps{}) {
+		@components.CardHeader(components.CardHeaderProps{}) {
+			@components.CardTitle(components.CardTitleProps{Order: 2}, title)
+			@components.CardDescription(components.CardDescriptionProps{}, description)
+		}
+		@components.CardContent(components.CardContentProps{}) {
+			@elements.ActionRow(actions)
+		}
+	}
+}
+
+templ ContentTable(data ContentTableData) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-admin-screen",
+		Attrs: templpkg.Attributes{"data-gocms-block": "content-table"},
+	}) {
+		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
+			@ui.Stack(ui.StackProps{}) {
+				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
+				@elements.FieldHelp(data.Description)
+			}
+			@elements.ActionRow(data.Actions)
+		}
+		@ui.Table(ui.TableProps{Attrs: templpkg.Attributes{"data-gocms-resource": "content"}}) {
+			@ui.TableHead(ui.TableSectionProps{}) {
+				@ui.TableRow(ui.TableRowProps{}) {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Title }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Slug }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Status }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Author }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Actions }
+				}
+			}
+			@ui.TableBody(ui.TableSectionProps{}) {
+				for _, row := range data.Rows {
+					@ui.TableRow(ui.TableRowProps{}) {
+						@ui.TableCell(ui.TableCellProps{}) { { row.Title } }
+						@ui.TableCell(ui.TableCellProps{}) { { row.Slug } }
+						@ui.TableCell(ui.TableCellProps{}) {
+							@elements.StatusBadge(row.Status)
+						}
+						@ui.TableCell(ui.TableCellProps{}) { { row.Author } }
+						@ui.TableCell(ui.TableCellProps{}) {
+							@ui.Button(ui.ButtonProps{Href: row.EditURL, Variant: "outline"}, "Edit")
+						}
+					}
+				}
+			}
+		}
+		@elements.PaginationControl(data.Pagination)
+	}
+}
+
+templ ContentEditor(data ContentEditorData) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-admin-screen",
+		Attrs: templpkg.Attributes{"data-gocms-block": "content-editor"},
+	}) {
+		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
+			@ui.Stack(ui.StackProps{}) {
+				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
+				@elements.FieldHelp(data.Description)
+			}
+			@elements.StatusBadge(data.Status)
+		}
+		@elements.ValidationSummary(data.Errors)
+		@ui.Form(ui.FormProps{Action: data.Action, Method: "post", Class: "gocms-editor-grid", Attrs: templpkg.Attributes{"data-gocms-action": "save-content"}}) {
+			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
+			@ui.Stack(ui.StackProps{Class: "gocms-editor-main"}) {
+				for _, field := range data.Fields {
+					@ui.Field(toFieldProps(field))
+				}
+			}
+			@ui.Stack(ui.StackProps{Class: "gocms-editor-side"}) {
+				@components.Card(components.CardProps{}) {
+					@components.CardHeader(components.CardHeaderProps{}) {
+						@components.CardTitle(components.CardTitleProps{Order: 3}, "Publish")
+					}
+					@components.CardContent(components.CardContentProps{}) {
+						@ui.Field(ui.FieldProps{
+							ID: "status",
+							Name: "status",
+							Label: "Status",
+							Component: "select",
+							Value: data.Status,
+							Options: statusOptions(),
+						})
+					}
+					@components.CardFooter(components.CardFooterProps{}) {
+						@ui.Group(ui.GroupProps{Class: "gocms-admin-actions"}) {
+							@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+							for _, action := range data.Actions {
+								if action.Method == "" || action.Method == "GET" {
+									@ui.Button(ui.ButtonProps{Href: action.Href, Variant: "outline", Disabled: !action.Enabled}, action.Label)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ SettingsCard(data ContentEditorData) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-admin-screen",
+		Attrs: templpkg.Attributes{"data-gocms-block": "settings-card"},
+	}) {
+		@ui.Title(ui.TitleProps{Order: 2}, data.Title)
+		@elements.ValidationSummary(data.Errors)
+		@ui.Form(ui.FormProps{Action: data.Action, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": "save-settings"}}) {
+			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
+			for _, field := range data.Fields {
+				@ui.Field(toFieldProps(field))
+			}
+			@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+		}
+	}
+}
+
+templ SimpleList(data SimpleListData) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-admin-screen",
+		Attrs: templpkg.Attributes{"data-gocms-block": data.Marker},
+	}) {
+		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
+			@ui.Stack(ui.StackProps{}) {
+				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
+				@elements.FieldHelp(data.Description)
+			}
+			@elements.ActionRow(data.Actions)
+		}
+		if data.FormAction != "" && len(data.Fields) > 0 {
+			@ui.Form(ui.FormProps{Action: data.FormAction, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": data.Marker + "-save"}}) {
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
+				for _, field := range data.Fields {
+					@ui.Field(toFieldProps(field))
+				}
+				@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+			}
+		}
+		@ui.Table(ui.TableProps{}) {
+			@ui.TableHead(ui.TableSectionProps{}) {
+				@ui.TableRow(ui.TableRowProps{}) {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Name }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Description }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Status }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Actions }
+				}
+			}
+			@ui.TableBody(ui.TableSectionProps{}) {
+				for _, row := range data.Rows {
+					@ui.TableRow(ui.TableRowProps{}) {
+						@ui.TableCell(ui.TableCellProps{}) { { row.Label } }
+						@ui.TableCell(ui.TableCellProps{}) { { row.Description } }
+						@ui.TableCell(ui.TableCellProps{}) {
+							@elements.StatusBadge(row.Status)
+						}
+						@ui.TableCell(ui.TableCellProps{}) {
+							if row.ActionURL != "" {
+								@ui.Button(ui.ButtonProps{Href: row.ActionURL, Variant: "outline"}, "Open")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

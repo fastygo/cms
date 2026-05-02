@@ -1,0 +1,89 @@
+package elements
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/ui8kit/ui"
+	"github.com/fastygo/ui8kit/utils"
+)
+
+templ StatusBadge(status string) {
+	@ui.Text(ui.TextProps{
+		Tag:   "span",
+		Class: utils.Cn("gocms-status-badge", statusClass(status)),
+	}, statusLabel(status))
+}
+
+templ CapabilityBadge(label string) {
+	@ui.Text(ui.TextProps{Tag: "span", Class: "gocms-status-badge"}, label)
+}
+
+templ FieldHelp(text string) {
+	if text != "" {
+		@ui.Text(ui.TextProps{Class: "gocms-muted", FontSize: "sm"}, text)
+	}
+}
+
+templ ValidationSummary(errors []FieldError) {
+	if len(errors) > 0 {
+		@MarkerDiv(MarkerProps{
+			Class: "ui-stack gocms-danger-zone",
+			Attrs: templpkg.Attributes{"data-gocms-element": "validation-summary", "data-gocms-error": "form"},
+		}) {
+			@ui.Text(ui.TextProps{FontWeight: "semibold", TextColor: "destructive"}, "Please review the form.")
+			for _, err := range errors {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "destructive"}, err.Field+": "+err.Message)
+			}
+		}
+	}
+}
+
+templ ActionRow(actions []Action) {
+	@MarkerDiv(MarkerProps{
+		Class: "ui-group gocms-admin-actions",
+		Attrs: templpkg.Attributes{"data-gocms-element": "action-row"},
+	}) {
+		for _, action := range actions {
+			if action.Enabled && (action.Method == "" || action.Method == "GET") {
+				@ui.Button(ui.ButtonProps{Href: action.Href, Variant: buttonVariant(action.Style)}, action.Label)
+			}
+		}
+	}
+}
+
+templ PaginationControl(data PaginationData) {
+	if data.TotalPages > 1 {
+		@MarkerDiv(MarkerProps{
+			Class: "ui-group gocms-admin-actions",
+			Attrs: templpkg.Attributes{"data-gocms-element": "pagination"},
+		}) {
+			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page-1), Variant: "outline", Disabled: data.Page <= 1}, "Previous")
+			@ui.Text(ui.TextProps{FontSize: "sm"}, pageLabel(data.Page, data.TotalPages))
+			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page+1), Variant: "outline", Disabled: data.Page >= data.TotalPages}, "Next")
+		}
+	}
+}
+
+templ MediaThumbnail(data MediaThumbnailData) {
+	@MarkerDiv(MarkerProps{
+		Class: "ui-stack gap-2",
+		Attrs: templpkg.Attributes{"data-gocms-element": "media-thumbnail"},
+	}) {
+		if data.URL != "" {
+			@ui.Image(ui.ImageProps{Src: data.URL, Alt: data.Alt, Class: "rounded-md border border-border", Width: "160", Height: "96", Fit: "cover"})
+		}
+		@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Label)
+	}
+}
+
+templ AccountActions(data AccountActionsData) {
+	@MarkerDiv(MarkerProps{
+		Class: "ui-group gocms-admin-actions",
+		Attrs: templpkg.Attributes{"data-gocms-element": "account-actions"},
+	}) {
+		@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Email)
+		@ui.Form(ui.FormProps{Action: "/go-logout", Method: "post"}) {
+			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
+			@ui.Button(ui.ButtonProps{Type: "submit", Variant: "outline"}, "Sign out")
+		}
+	}
+}

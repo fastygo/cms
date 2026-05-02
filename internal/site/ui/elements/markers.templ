@@ -1,0 +1,24 @@
+package elements
+
+import templpkg "github.com/a-h/templ"
+
+// MarkerProps describes a raw-tag wrapper enriched with data-gocms-* attributes.
+// Local primitive used because upstream UI8Kit Box/Stack/Group/Block/Grid props
+// in v0.4.0 do not accept arbitrary attributes; markers are required as
+// stable selectors for conformance tests independent of CSS class names.
+type MarkerProps struct {
+	Class string
+	Attrs templpkg.Attributes
+}
+
+templ MarkerSection(props MarkerProps) {
+	<section class={ props.Class } { props.Attrs... }>{ children... }</section>
+}
+
+templ MarkerMain(props MarkerProps) {
+	<main class={ props.Class } { props.Attrs... }>{ children... }</main>
+}
+
+templ MarkerDiv(props MarkerProps) {
+	<div class={ props.Class } { props.Attrs... }>{ children... }</div>
+}

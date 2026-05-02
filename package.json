@@ -1,0 +1,29 @@
+{
+  "name": "fastygo-gocms",
+  "private": true,
+  "scripts": {
+    "vendor:assets": "go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static",
+    "dev:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --watch",
+    "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --minify",
+    "build:versioned": "node ./scripts/version-assets.mjs",
+    "lint:templ-tags": "node ./scripts/check-templ-raw-tags.mjs",
+    "lint:css-apply": "node ./scripts/check-css-apply-only.mjs",
+    "lint:imports": "node ./scripts/check-ui-import-boundaries.mjs",
+    "lint:architecture": "npm run lint:templ-tags && npm run lint:css-apply && npm run lint:imports",
+    "build": "npm run lint:architecture && go run github.com/a-h/templ/cmd/templ generate ./... && npm run vendor:assets && npm run build:css && npm run build:versioned",
+    "verify": "npm run build && npx ui8px@latest lint ./... --ignore .manual .project web/static/css/ui8kit && go test ./...",
+    "preview": "npm run build && export APP_STATIC_DIR=web/static && go run ./cmd/server"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
+    "@ui8kit/aria": "0.1.0",
+    "tailwindcss": "^4.2.1"
+  },
+  "ui8kit": {
+    "aria": {
+      "mode": "subset",
+      "patterns": ["dialog", "tabs", "accordion", "combobox", "tooltip", "disclosure"],
+      "autoInit": true
+    }
+  }
+}

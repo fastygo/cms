@@ -1,0 +1,14 @@
+---
+description: GoCMS documentation and implementation layer boundaries
+alwaysApply: true
+---
+
+# GoCMS Project Layers
+
+- Treat `go-codex/en` as the external compatibility contract: observable behavior, URLs, REST shape, admin behavior, themes, plugins, hooks, capabilities, and conformance.
+- Treat `go-stack/en` as the Go-native architecture profile: domain packages, services, repositories, adapters, plugin runtime strategies, jobs, and conformance adapters.
+- Treat `go-ui8kit/en` as the UI8Kit admin profile only: admin shell, composition, ARIA, runtime assets, styling, and UI conformance.
+- Do not put concrete UI/toolkit requirements into `go-codex/en` or `go-stack/en`.
+- Do not claim UI8Kit is required for general GoCMS compatibility; it is only one official implementation profile.
+- If layers conflict, external compatibility in `go-codex/en` wins for public behavior.
+- Keep docs and code free of unrelated CMS brand references; describe GoCMS-native contracts and URLs.

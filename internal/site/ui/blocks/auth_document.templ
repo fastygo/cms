@@ -1,0 +1,159 @@
+package blocks
+
+// AuthDocumentProps configures the self-contained authentication document.
+// Local primitive because the GoCMS login page must not depend on the admin
+// asset bundle (versioned CSS/JS) and ships with inline styles only.
+type AuthDocumentProps struct {
+	Title string
+	Lang  string
+}
+
+templ AuthDocument(props AuthDocumentProps) {
+	<!DOCTYPE html>
+	<html lang={ authLang(props.Lang) }>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title }</title>
+			<style>
+				:root {
+					--auth-bg: #f0f0f1;
+					--auth-card: #ffffff;
+					--auth-text: #1d2327;
+					--auth-muted: #646970;
+					--auth-border: #c3c4c7;
+					--auth-primary: #2271b1;
+					--auth-primary-hover: #135e96;
+					--auth-error: #b32d2e;
+					--auth-radius: 4px;
+					--auth-shadow: 0 1px 3px rgba(0, 0, 0, 0.13);
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+				}
+
+				* {
+					box-sizing: border-box;
+				}
+
+				html,
+				body {
+					min-height: 100%;
+				}
+
+				body {
+					margin: 0;
+					background: var(--auth-bg);
+					color: var(--auth-text);
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+					font-size: 14px;
+					line-height: 1.5;
+				}
+
+				.gocms-login-shell {
+					display: flex;
+					min-height: 100vh;
+					align-items: center;
+					justify-content: center;
+					padding: 24px;
+				}
+
+				.gocms-login-card,
+				.ui-card {
+					width: min(100%, 360px);
+					background: var(--auth-card);
+					border: 1px solid var(--auth-border);
+					border-radius: var(--auth-radius);
+					box-shadow: var(--auth-shadow);
+				}
+
+				.ui-card-header,
+				.ui-card-content {
+					padding: 24px;
+				}
+
+				.ui-card-header {
+					padding-bottom: 8px;
+					text-align: center;
+				}
+
+				.ui-card-title {
+					margin: 0;
+					font-size: 28px;
+					font-weight: 500;
+					letter-spacing: -0.02em;
+				}
+
+				.ui-card-content,
+				.ui-form,
+				.ui-field-wrap {
+					display: grid;
+					gap: 16px;
+				}
+
+				.ui-field-label {
+					display: block;
+					color: var(--auth-text);
+					font-size: 14px;
+				}
+
+				.ui-field-wrap input {
+					width: 100%;
+					min-height: 40px;
+					border: 1px solid var(--auth-border);
+					border-radius: var(--auth-radius);
+					background: #ffffff;
+					padding: 8px 10px;
+					color: var(--auth-text);
+					font-size: 16px;
+				}
+
+				.ui-field-wrap input:focus {
+					border-color: var(--auth-primary);
+					box-shadow: 0 0 0 1px var(--auth-primary);
+					outline: none;
+				}
+
+				.ui-form button,
+				.ui-form [type="submit"] {
+					display: inline-flex;
+					min-height: 40px;
+					align-items: center;
+					justify-content: center;
+					border: 1px solid var(--auth-primary);
+					border-radius: var(--auth-radius);
+					background: var(--auth-primary);
+					padding: 8px 14px;
+					color: #ffffff;
+					font: inherit;
+					font-weight: 500;
+					text-decoration: none;
+					cursor: pointer;
+				}
+
+				.ui-form button:hover,
+				.ui-form [type="submit"]:hover {
+					background: var(--auth-primary-hover);
+					border-color: var(--auth-primary-hover);
+				}
+
+				.text-destructive,
+				[role="alert"] {
+					color: var(--auth-error);
+				}
+
+				.text-muted-foreground {
+					color: var(--auth-muted);
+				}
+			</style>
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+func authLang(lang string) string {
+	if lang == "" {
+		return "en"
+	}
+	return lang
+}

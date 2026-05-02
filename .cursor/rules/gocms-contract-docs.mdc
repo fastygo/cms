@@ -1,0 +1,15 @@
+---
+description: Rules for GoCMS compatibility and profile documentation
+globs: go-codex/en/**/*.md,go-stack/en/**/*.md,go-ui8kit/en/**/*.md
+alwaysApply: false
+---
+
+# GoCMS Contract Documentation
+
+- Use English in contract/profile docs unless the user explicitly asks for another language.
+- Use RFC-style terms intentionally: `MUST`, `MUST NOT`, `SHOULD`, `MAY`, `OPTIONAL`.
+- In `go-codex/en`, document only observable compatibility behavior; do not prescribe implementation packages, storage, UI, or runtime choices.
+- In `go-stack/en`, document Go-native architecture choices without mentioning UI8Kit, templ, ui8px, shadcn, or concrete UI rules.
+- In `go-ui8kit/en`, document UI8Kit profile rules, but state that UI8Kit is not required for general compatibility.
+- Prefer stable identifiers and paths: `/go-admin`, `/go-login`, `/go-logout`, `/go-json`, `/go-json/go/v2/`.
+- Keep docs testable: every requirement should be observable by conformance tests or clearly marked as guidance.

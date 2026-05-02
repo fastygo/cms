@@ -1,0 +1,69 @@
+@layer components {
+  .gocms-admin-screen {
+    @apply grid gap-6;
+  }
+
+  .gocms-admin-header {
+    @apply flex flex-wrap items-start justify-between gap-4;
+  }
+
+  .gocms-admin-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .gocms-dashboard-grid {
+    @apply grid gap-4 md:grid-cols-3;
+  }
+
+  .gocms-form-grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .gocms-editor-grid {
+    @apply grid gap-4 xl:grid-cols-3;
+  }
+
+  .gocms-editor-main {
+    @apply grid gap-4 xl:col-span-2;
+  }
+
+  .gocms-editor-side {
+    @apply grid gap-4;
+  }
+
+  .gocms-status-badge {
+    @apply inline-flex items-center rounded-full border border-border px-2 py-2 text-xs font-medium;
+  }
+
+  .gocms-status-badge--published {
+    @apply border-primary bg-primary text-primary-foreground;
+  }
+
+  .gocms-status-badge--draft {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  .gocms-status-badge--scheduled {
+    @apply bg-accent text-accent-foreground;
+  }
+
+  .gocms-status-badge--trashed {
+    @apply border-destructive text-destructive;
+  }
+
+  .gocms-muted {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .gocms-login-shell {
+    @apply flex min-h-screen items-center justify-center bg-background p-4;
+  }
+
+  .gocms-login-card {
+    @apply w-full max-w-sm;
+  }
+
+  .gocms-danger-zone {
+    @apply border-destructive;
+  }
+}

@@ -1,0 +1,7 @@
+tmp/
+.DS_Store
+.manual/
+.project/
+*.db
+*.db-shm
+*.db-wal
