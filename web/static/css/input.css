@@ -5,7 +5,7 @@
 @source "../../../internal/site/ui/**/*.go";
 @source "../../../internal/infra/features/**/*.go";
 
-@import "./tokens.css";
+/*@import "./tokens.css";*/
 @import "./fonts.css";
 @import "./ui8kit/base.css";
 @import "./ui8kit/shell.css";

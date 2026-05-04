@@ -12,7 +12,8 @@
     "lint:architecture": "npm run lint:templ-tags && npm run lint:css-apply && npm run lint:imports",
     "build": "npm run lint:architecture && go run github.com/a-h/templ/cmd/templ generate ./... && npm run vendor:assets && npm run build:css && npm run build:versioned",
     "verify": "npm run build && npx ui8px@latest lint ./... --ignore .manual .project web/static/css/ui8kit && go test ./...",
-    "preview": "npm run build && export APP_STATIC_DIR=web/static && go run ./cmd/server"
+    "preview": "npm run build && go run ./cmd/server",
+    "go": "npm run build:css && npm run build:versioned && go run ./cmd/server"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.1",
