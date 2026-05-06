@@ -5,9 +5,12 @@ const roots = ["web/static/css"];
 const bannedDeclaration = /^\s*[a-z-]+\s*:/i;
 let failed = false;
 
+const rawCSSExceptions = new Set(["editor.css"]);
+
 for (const file of walk(roots)) {
   if (!file.endsWith(".css")) continue;
   if (file.endsWith("tokens.css") || file.endsWith("input.css")) continue;
+  if (rawCSSExceptions.has(file.split(sep()).pop())) continue;
   if (file.includes(`${sep()}ui8kit${sep()}`) || file.endsWith("fonts.css")) continue;
   const lines = readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, index) => {

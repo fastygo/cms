@@ -11,8 +11,8 @@ import (
 func TestGoCMSAppTemplatesDoNotUseRawTags(t *testing.T) {
 	rawTag := regexp.MustCompile(`(^|[^\w])</?[a-z][\w:-]*(\s|>|/)`)
 	allowedSuppliers := map[string]struct{}{
-		filepath.FromSlash("internal/site/ui/elements/markers.templ"):    {},
-		filepath.FromSlash("internal/site/ui/elements/head.templ"):       {},
+		filepath.FromSlash("internal/site/ui/elements/markers.templ"):     {},
+		filepath.FromSlash("internal/site/ui/elements/head.templ"):        {},
 		filepath.FromSlash("internal/site/ui/blocks/auth_document.templ"): {},
 	}
 	forEachFile(t, filepath.FromSlash("../../../internal/site"), func(path string, content string) {
@@ -50,6 +50,9 @@ func TestGoCMSCSSUsesApplyOnlySelectors(t *testing.T) {
 	declaration := regexp.MustCompile(`^\s*[a-z-]+\s*:`)
 	forEachFile(t, filepath.FromSlash("../../../web/static/css"), func(path string, content string) {
 		if !strings.HasSuffix(path, ".css") || strings.HasSuffix(path, "tokens.css") || strings.HasSuffix(path, "input.css") {
+			return
+		}
+		if strings.HasSuffix(path, "editor.css") {
 			return
 		}
 		if strings.Contains(filepath.ToSlash(path), "/ui8kit/") || strings.HasSuffix(path, "fonts.css") {

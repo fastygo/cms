@@ -20,15 +20,63 @@
   }
 
   .gocms-editor-grid {
-    @apply grid gap-4 xl:grid-cols-3;
+    @apply grid items-start gap-6 xl:grid-cols-3;
   }
 
   .gocms-editor-main {
-    @apply grid gap-4 xl:col-span-2;
+    @apply grid gap-6 xl:col-span-2;
   }
 
   .gocms-editor-side {
-    @apply grid gap-4;
+    @apply grid gap-4 xl:col-span-1 xl:sticky xl:top-6;
+  }
+
+  .gocms-editor-panel {
+    @apply grid gap-4 rounded border border-border bg-card p-4 shadow-sm;
+  }
+
+  .gocms-editor-basics {
+    @apply gap-4;
+  }
+
+  .gocms-editor-summary {
+    @apply gap-4;
+  }
+
+  .gocms-editor-details {
+    @apply grid gap-4 lg:grid-cols-2;
+  }
+
+  .gocms-richtext-field {
+    @apply gap-0 overflow-hidden p-0;
+  }
+
+  .gocms-richtext-header {
+    @apply gap-2 border-b border-border px-6 py-4;
+  }
+
+  .gocms-richtext-toolbar {
+    @apply flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-3;
+  }
+
+  .gocms-richtext-surface {
+    @apply min-h-96 w-full whitespace-pre-wrap bg-background px-6 py-6 outline-none;
+  }
+
+  .gocms-richtext-surface:focus {
+    @apply bg-accent;
+  }
+
+  .gocms-richtext-surface > :first-child {
+    @apply mt-0;
+  }
+
+  .gocms-richtext-surface > :last-child {
+    @apply mb-0;
+  }
+
+  .gocms-richtext-input-fallback {
+    @apply min-h-96;
   }
 
   .gocms-status-badge {

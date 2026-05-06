@@ -5,7 +5,8 @@
     "vendor:assets": "go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static",
     "dev:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --watch",
     "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --minify",
-    "build:versioned": "node ./scripts/version-assets.mjs",
+    "build:editor": "esbuild ./web/src/admin-editor.js --bundle --format=iife --platform=browser --target=es2020 --minify --outfile=./web/static/js/admin-editor.js",
+    "build:versioned": "npm run build:editor && node ./scripts/version-assets.mjs",
     "build:presets": "node ./scripts/build-presets.mjs",
     "package:presets": "npm run build && node ./scripts/package-presets.mjs",
     "lint:templ-tags": "node ./scripts/check-templ-raw-tags.mjs",
@@ -14,19 +15,41 @@
     "lint:architecture": "npm run lint:templ-tags && npm run lint:css-apply && npm run lint:imports",
     "build": "npm run lint:architecture && go tool templ generate ./... && npm run vendor:assets && npm run build:css && npm run build:versioned",
     "verify": "npm run build && npx ui8px@latest lint ./... --ignore .manual .project web/static/css/ui8kit && go test ./...",
+    "serve": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs",
+    "serve:preset:full": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --preset full",
+    "serve:preset:headless": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --preset headless",
+    "serve:preset:playground": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --preset playground",
+    "serve:preset:offline-json-sql": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --preset offline-json-sql",
+    "serve:preset:ssh-fixtures": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --preset ssh-fixtures",
+    "serve:mode:full": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --runtime full",
+    "serve:mode:admin": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --runtime admin",
+    "serve:mode:headless": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --runtime headless",
+    "serve:mode:playground": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --runtime playground",
+    "serve:mode:conformance": "npm run build:css && npm run build:versioned && node ./scripts/run-server.mjs --runtime conformance",
     "preview": "npm run build && go run ./cmd/server",
     "preview:preset": "node ./scripts/run-preset.mjs",
     "go": "npm run build:css && npm run build:versioned && go run ./cmd/server"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.1",
+    "@tiptap/core": "^3.22.5",
+    "@tiptap/extension-link": "^3.22.5",
+    "@tiptap/starter-kit": "^3.22.5",
     "@ui8kit/aria": "0.1.0",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.2.1"
   },
   "ui8kit": {
     "aria": {
       "mode": "subset",
-      "patterns": ["dialog", "tabs", "accordion", "combobox", "tooltip", "disclosure"],
+      "patterns": [
+        "dialog",
+        "tabs",
+        "accordion",
+        "combobox",
+        "tooltip",
+        "disclosure"
+      ],
       "autoInit": true
     }
   }

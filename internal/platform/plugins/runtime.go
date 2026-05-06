@@ -103,6 +103,13 @@ type ScreenActionRegistration struct {
 	Build    func(adminfixtures.AdminFixture) []elements.Action
 }
 
+type EditorProviderRegistration struct {
+	ID          string
+	Label       string
+	Description string
+	Priority    int
+}
+
 type Route struct {
 	Pattern          string
 	Surface          Surface
@@ -113,13 +120,14 @@ type Route struct {
 }
 
 type Registry struct {
-	adminMenu     []AdminMenuItem
-	screenActions map[string][]ScreenActionRegistration
-	routes        []Route
-	assets        []Asset
-	capabilities  []CapabilityDefinition
-	settings      []SettingDefinition
-	hooks         []HookRegistration
+	adminMenu       []AdminMenuItem
+	screenActions   map[string][]ScreenActionRegistration
+	editorProviders []EditorProviderRegistration
+	routes          []Route
+	assets          []Asset
+	capabilities    []CapabilityDefinition
+	settings        []SettingDefinition
+	hooks           []HookRegistration
 }
 
 func NewRegistry() *Registry {
@@ -133,6 +141,25 @@ func (r *Registry) AddAdminMenu(item AdminMenuItem) {
 func (r *Registry) AddScreenActions(actions ...ScreenActionRegistration) {
 	for _, action := range actions {
 		r.screenActions[action.ScreenID] = append(r.screenActions[action.ScreenID], action)
+	}
+}
+
+func (r *Registry) AddEditorProviders(providers ...EditorProviderRegistration) {
+	for _, provider := range providers {
+		if strings.TrimSpace(provider.ID) == "" {
+			continue
+		}
+		replaced := false
+		for i := range r.editorProviders {
+			if r.editorProviders[i].ID == provider.ID {
+				r.editorProviders[i] = provider
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			r.editorProviders = append(r.editorProviders, provider)
+		}
 	}
 }
 
@@ -187,6 +214,30 @@ func (r *Registry) ScreenActions(screenID string, fixture adminfixtures.AdminFix
 		actions = append(actions, builder.Build(fixture)...)
 	}
 	return actions
+}
+
+func (r *Registry) EditorProviders() []EditorProviderRegistration {
+	items := append([]EditorProviderRegistration(nil), r.editorProviders...)
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Priority == items[j].Priority {
+			return items[i].Label < items[j].Label
+		}
+		return items[i].Priority < items[j].Priority
+	})
+	return items
+}
+
+func (r *Registry) ResolveEditorProvider(id string) (EditorProviderRegistration, bool) {
+	items := r.EditorProviders()
+	for _, item := range items {
+		if item.ID == id {
+			return item, true
+		}
+	}
+	if len(items) == 0 {
+		return EditorProviderRegistration{}, false
+	}
+	return items[0], true
 }
 
 func (r *Registry) AssetsForSurface(surface Surface) []Asset {

@@ -4,6 +4,7 @@
 @source "../../../internal/site/ui/**/*.templ";
 @source "../../../internal/site/ui/**/*.go";
 @source "../../../internal/infra/features/**/*.go";
+@source "../../../web/src/**/*.js";
 
 /*@import "./tokens.css";*/
 @import "./fonts.css";
@@ -13,3 +14,4 @@
 @import "./ui8kit/latty.css";
 @import "./ui8kit/prose.css";
 @import "./admin.css";
+@import "./editor.css";

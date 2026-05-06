@@ -119,8 +119,17 @@ templ ContentEditor(data ContentEditorData) {
 		@ui.Form(ui.FormProps{Action: data.Action, Method: "post", Class: "gocms-editor-grid", Attrs: templpkg.Attributes{"data-gocms-action": "save-content"}}) {
 			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
 			@ui.Stack(ui.StackProps{Class: "gocms-editor-main"}) {
-				for _, field := range data.Fields {
-					@ui.Field(toFieldProps(field))
+				if fields := editorFieldsByIDs(data.Fields, "title", "slug"); len(fields) > 0 {
+					@EditorFieldGroup("gocms-editor-basics", fields)
+				}
+				if field, ok := editorFieldByID(data.Fields, "content"); ok {
+					@RichTextField(field)
+				}
+				if fields := editorFieldsByIDs(data.Fields, "excerpt"); len(fields) > 0 {
+					@EditorFieldGroup("gocms-editor-summary", fields)
+				}
+				if fields := editorFieldsWithoutIDs(data.Fields, "title", "slug", "content", "excerpt"); len(fields) > 0 {
+					@EditorFieldGroup("gocms-editor-details", fields)
 				}
 			}
 			@ui.Stack(ui.StackProps{Class: "gocms-editor-side"}) {
@@ -152,6 +161,115 @@ templ ContentEditor(data ContentEditorData) {
 			}
 		}
 	}
+}
+
+templ EditorFieldGroup(className string, fields []FieldData) {
+	@elements.MarkerDiv(elements.MarkerProps{Class: editorPanelClass(className)}) {
+		for _, field := range fields {
+			if field.Editor != nil {
+				@RichTextField(field)
+			} else {
+				@ui.Field(toFieldProps(field))
+			}
+		}
+	}
+}
+
+templ RichTextField(field FieldData) {
+	@elements.MarkerDiv(elements.MarkerProps{
+		Class: editorPanelClass("gocms-richtext-field"),
+		Attrs: templpkg.Attributes{
+			"data-gocms-editor-provider": field.Editor.ProviderID,
+			"data-gocms-editor-field":    field.Name,
+		},
+	}) {
+		@ui.Stack(ui.StackProps{Class: "gocms-richtext-header"}) {
+			if field.Label != "" {
+				@ui.Text(ui.TextProps{Tag: "strong", FontSize: "sm", FontWeight: "medium"}, field.Label)
+			}
+			@elements.FieldHelp(field.Hint)
+		}
+		@elements.MarkerDiv(elements.MarkerProps{
+			Class: "gocms-richtext-toolbar",
+			Attrs: templpkg.Attributes{
+				"data-gocms-editor-toolbar": "true",
+				"hidden":                   "hidden",
+			},
+		})
+		@elements.MarkerDiv(elements.MarkerProps{
+			Class: "gocms-richtext-surface-host",
+			Attrs: templpkg.Attributes{
+				"id":                        field.ID + "-surface",
+				"data-gocms-editor-surface": "true",
+				"hidden":                    "hidden",
+			},
+		})
+		@ui.Field(ui.FieldProps{
+			ID:          field.ID,
+			Name:        field.Name,
+			Value:       field.Value,
+			Component:   "textarea",
+			Class:       "gocms-richtext-input-fallback",
+			Rows:        richTextRows(field.Rows),
+			Placeholder: field.Placeholder,
+			Required:    field.Required,
+			Attrs: templpkg.Attributes{
+				"data-gocms-editor-input": "true",
+			},
+		})
+	}
+}
+
+func richTextRows(rows int) int {
+	if rows > 0 {
+		return rows
+	}
+	return 12
+}
+
+func editorPanelClass(className string) string {
+	if className == "" {
+		return "gocms-editor-panel"
+	}
+	return "gocms-editor-panel " + className
+}
+
+func editorFieldByID(fields []FieldData, id string) (FieldData, bool) {
+	for _, field := range fields {
+		if field.ID == id {
+			return field, true
+		}
+	}
+	return FieldData{}, false
+}
+
+func editorFieldsByIDs(fields []FieldData, ids ...string) []FieldData {
+	allowed := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		allowed[id] = struct{}{}
+	}
+	result := make([]FieldData, 0, len(ids))
+	for _, field := range fields {
+		if _, ok := allowed[field.ID]; ok {
+			result = append(result, field)
+		}
+	}
+	return result
+}
+
+func editorFieldsWithoutIDs(fields []FieldData, ids ...string) []FieldData {
+	excluded := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		excluded[id] = struct{}{}
+	}
+	result := make([]FieldData, 0, len(fields))
+	for _, field := range fields {
+		if _, ok := excluded[field.ID]; ok {
+			continue
+		}
+		result = append(result, field)
+	}
+	return result
 }
 
 templ SettingsCard(data ContentEditorData) {

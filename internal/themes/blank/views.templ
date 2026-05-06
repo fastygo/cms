@@ -34,7 +34,9 @@ templ ThemePage(data publicrender.PublicPage) {
 						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Description)
 					}
 					if data.Content != "" {
-						@ui.Text(ui.TextProps{LineHeight: "relaxed"}, data.Content)
+						@ui.Block(ui.BlockProps{Tag: "section", Class: "prose max-w-none"}) {
+							@templpkg.Raw(data.Content)
+						}
 					}
 					for _, item := range data.Items {
 						@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "link"}, item.Title)

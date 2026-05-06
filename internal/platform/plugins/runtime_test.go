@@ -21,6 +21,12 @@ func (d testDescriptor) Register(_ context.Context, registry *Registry) error {
 	if d.err != nil {
 		return d.err
 	}
+	registry.AddEditorProviders(EditorProviderRegistration{
+		ID:          "plugin-editor",
+		Label:       "Plugin Editor",
+		Description: "Plugin-provided editor",
+		Priority:    50,
+	})
 	registry.AddScreenActions(ScreenActionRegistration{
 		ScreenID: "settings",
 		Build: func(adminfixtures.AdminFixture) []elements.Action {
@@ -47,6 +53,9 @@ func TestRuntimeActivateRegistersCompiledPlugins(t *testing.T) {
 	}
 	if len(registry.AssetsForSurface(SurfaceAdmin)) != 1 {
 		t.Fatalf("expected plugin asset to be registered")
+	}
+	if provider, ok := registry.ResolveEditorProvider("plugin-editor"); !ok || provider.ID != "plugin-editor" {
+		t.Fatalf("expected plugin editor provider to be registered, got %v %v", provider, ok)
 	}
 }
 
@@ -111,5 +120,21 @@ func TestRegistryKeepsRoutesAndCapabilityFilteredMenuTogether(t *testing.T) {
 	rootItems := registry.AdminMenuItems(authz.Root())
 	if len(rootItems) != 1 || rootItems[0].ID != "example" {
 		t.Fatalf("root menu = %v, want example item", rootItems)
+	}
+}
+
+func TestRegistryResolveEditorProviderFallsBackToPriorityOrder(t *testing.T) {
+	registry := NewRegistry()
+	registry.AddEditorProviders(
+		EditorProviderRegistration{ID: "fallback", Label: "Fallback", Priority: 20},
+		EditorProviderRegistration{ID: "primary", Label: "Primary", Priority: 10},
+	)
+
+	resolved, ok := registry.ResolveEditorProvider("missing")
+	if !ok {
+		t.Fatalf("expected fallback editor provider")
+	}
+	if resolved.ID != "primary" {
+		t.Fatalf("resolved editor provider = %q, want primary", resolved.ID)
 	}
 }

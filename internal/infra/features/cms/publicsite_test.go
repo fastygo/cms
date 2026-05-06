@@ -125,6 +125,50 @@ func TestPublicThemePreviewAndActivationAffectRender(t *testing.T) {
 	}
 }
 
+func TestPublicContentBodyRendersHTMLInsideProse(t *testing.T) {
+	module := newModuleForPublicTests(t, "full", nil)
+	t.Cleanup(func() {
+		_ = module.Close(t.Context())
+	})
+
+	entry, err := module.store.Get(t.Context(), domaincontent.ID("content-post-published"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Body = domaincontent.LocalizedText{
+		"en": "<p>Public <strong>fixture</strong> <em>content</em></p><blockquote><p>Rendered quote</p></blockquote>",
+	}
+	if err := module.store.Save(t.Context(), entry); err != nil {
+		t.Fatal(err)
+	}
+
+	mux := http.NewServeMux()
+	module.Routes(mux)
+
+	post := requestPublic(mux, http.MethodGet, "/published-post/", "", "")
+	if post.Code != http.StatusOK {
+		t.Fatalf("post response = %d body = %s", post.Code, post.Body.String())
+	}
+	for _, expected := range []string{
+		`prose max-w-none`,
+		`<strong>fixture</strong>`,
+		`<em>content</em>`,
+		`<blockquote><p>Rendered quote</p></blockquote>`,
+	} {
+		if !strings.Contains(post.Body.String(), expected) {
+			t.Fatalf("expected rendered post body to contain %q", expected)
+		}
+	}
+	for _, unexpected := range []string{
+		`&lt;strong&gt;fixture&lt;/strong&gt;`,
+		`&lt;blockquote&gt;`,
+	} {
+		if strings.Contains(post.Body.String(), unexpected) {
+			t.Fatalf("expected public body HTML to render, got escaped fragment %q", unexpected)
+		}
+	}
+}
+
 func TestPublicArchivesExposePaginationWithoutPrivateLeaks(t *testing.T) {
 	module := newModuleForPublicTests(t, "full", nil)
 	t.Cleanup(func() {

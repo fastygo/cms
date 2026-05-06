@@ -1,0 +1,69 @@
+.gocms-richtext-field {
+  overflow: hidden;
+}
+
+.gocms-richtext-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.gocms-richtext-toolbar button[aria-pressed="true"] {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.gocms-richtext-surface-host {
+  display: block;
+}
+
+.gocms-richtext-surface {
+  display: block;
+  min-height: 24rem;
+  width: 100%;
+  padding: 1.5rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 0;
+  outline: none;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
+  caret-color: currentColor;
+  line-height: 1.75;
+  font-size: 1rem;
+}
+
+.gocms-richtext-surface:focus {
+  background: hsl(var(--accent));
+}
+
+.gocms-richtext-surface.ProseMirror {
+  white-space: normal;
+}
+
+.gocms-richtext-surface.ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.gocms-richtext-surface.ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+.gocms-richtext-surface.ProseMirror p {
+  min-height: 1.5em;
+}
+
+.gocms-richtext-surface.ProseMirror ul,
+.gocms-richtext-surface.ProseMirror ol {
+  padding-left: 1.5rem;
+}
+
+.gocms-richtext-surface.ProseMirror blockquote {
+  margin-left: 0;
+}
+
+.gocms-richtext-input-fallback {
+  min-height: 24rem;
+}

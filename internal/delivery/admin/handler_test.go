@@ -74,10 +74,11 @@ func TestAdminUsesVersionedAssetsWhenManifestExists(t *testing.T) {
 	defer closeFn()
 
 	manifest := map[string]string{
-		"/static/css/app.css":     "/static/css/app.testhash123.css",
-		"/static/js/theme.js":     "/static/js/theme.testhash123.js",
-		"/static/js/ui8kit.js":    "/static/js/ui8kit.testhash123.js",
-		"/static/js/snapshots.js": "/static/js/snapshots.testhash123.js",
+		"/static/css/app.css":        "/static/css/app.testhash123.css",
+		"/static/js/admin-editor.js": "/static/js/admin-editor.testhash123.js",
+		"/static/js/theme.js":        "/static/js/theme.testhash123.js",
+		"/static/js/ui8kit.js":       "/static/js/ui8kit.testhash123.js",
+		"/static/js/snapshots.js":    "/static/js/snapshots.testhash123.js",
 	}
 	writeManifest(t, manifest)
 
@@ -114,6 +115,20 @@ func TestAdminContentWorkflowAndCapabilityChecks(t *testing.T) {
 	mux.ServeHTTP(newPage, adminReq)
 	if newPage.Code != http.StatusOK {
 		t.Fatalf("expected new post page, got %d: %s", newPage.Code, newPage.Body.String())
+	}
+	for _, expected := range []string{
+		`data-gocms-editor-provider="tiptap-basic"`,
+		`data-gocms-editor-field="content"`,
+		`gocms-richtext-surface-host`,
+		`gocms-editor-details`,
+		`/static/js/admin-editor`,
+	} {
+		if !strings.Contains(newPage.Body.String(), expected) {
+			t.Fatalf("expected content editor page to contain %q", expected)
+		}
+	}
+	if strings.Contains(newPage.Body.String(), `contenteditable="true"`) {
+		t.Fatalf("editor host must not render contenteditable; TipTap owns the ProseMirror editable node")
 	}
 	token := extractToken(t, newPage.Body.String())
 

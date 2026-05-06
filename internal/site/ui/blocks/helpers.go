@@ -18,6 +18,7 @@ func toFieldProps(field FieldData) ui.FieldProps {
 		Required:    field.Required,
 		Rows:        field.Rows,
 		Options:     field.Options,
+		Hint:        field.Hint,
 	}
 }
 

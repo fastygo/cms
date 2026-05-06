@@ -310,8 +310,8 @@ templ pagination(data publicrender.Pagination) {
 
 templ ifText(content string) {
 	if strings.TrimSpace(content) != "" {
-		@ui.Block(ui.BlockProps{Tag: "section"}) {
-			@ui.Text(ui.TextProps{LineHeight: "relaxed"}, content)
+		@ui.Block(ui.BlockProps{Tag: "section", Class: "prose max-w-none"}) {
+			@templpkg.Raw(content)
 		}
 	}
 }

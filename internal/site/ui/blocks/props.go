@@ -56,6 +56,10 @@ type PanelData struct {
 	Marker      string
 }
 
+type EditorData struct {
+	ProviderID string
+}
+
 type FieldData struct {
 	ID          string
 	Name        string
@@ -67,6 +71,8 @@ type FieldData struct {
 	Required    bool
 	Rows        int
 	Options     []ui.FieldOption
+	Hint        string
+	Editor      *EditorData
 }
 
 type ContentEditorData struct {

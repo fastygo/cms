@@ -96,6 +96,11 @@ type dashboardCardValue struct {
 	Href  string
 }
 
+const (
+	defaultEditorProviderID  = "tiptap-basic"
+	editorProviderSettingKey = "admin.editor.provider"
+)
+
 func NewHandler(services Services, authenticator rest.Authenticator, secret string, registry *plugins.Registry, playgroundAuth bool) Handler {
 	return NewHandlerWithOptions(services, authenticator, secret, registry, HandlerOptions{PlaygroundAuth: playgroundAuth})
 }
@@ -125,6 +130,17 @@ func NewHandlerWithOptions(services Services, authenticator rest.Authenticator, 
 }
 
 func (h Handler) registerCoreScreens() {
+	h.registry.AddEditorProviders(plugins.EditorProviderRegistration{
+		ID:          defaultEditorProviderID,
+		Label:       "TipTap (Basic)",
+		Description: "Built-in TipTap editor with starter formatting extensions and HTML storage.",
+		Priority:    0,
+	})
+	h.registry.AddAssets(plugins.Asset{
+		ID:      "admin-editor-tiptap-basic",
+		Surface: plugins.SurfaceAdmin,
+		Path:    "/static/js/admin-editor.js",
+	})
 	for _, item := range []plugins.AdminMenuItem{
 		{ID: "dashboard", Label: "Dashboard", Path: "/go-admin", Icon: "home", Order: 0},
 		{ID: "posts", Label: "Posts", Path: "/go-admin/posts", Icon: "file", Order: 1, Capability: authz.CapabilityContentReadPrivate},
@@ -386,7 +402,7 @@ func (h Handler) contentNew(kind domaincontent.Kind, screen string) func(http.Re
 		data := views.ContentEditPageData{
 			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_new", "New")+" "+singularName, "/go-admin/"+screen),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor(fixture, "New "+singularName, description, "/go-admin/"+screen, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
+			Editor: h.contentEditor(r.Context(), fixture, "New "+singularName, description, "/go-admin/"+screen, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -405,7 +421,7 @@ func (h Handler) contentEdit(screen string) func(http.ResponseWriter, *http.Requ
 		data := views.ContentEditPageData{
 			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), "/go-admin/"+screen),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor(fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, "/go-admin/"+screen+"/"+string(entry.ID), h.token("content-write"), entry),
+			Editor: h.contentEditor(r.Context(), fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, "/go-admin/"+screen+"/"+string(entry.ID), h.token("content-write"), entry),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -915,11 +931,16 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 	}
 }
 
-func (h Handler) contentEditor(bundle adminfixtures.AdminFixture, title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
+func (h Handler) contentEditor(ctx context.Context, bundle adminfixtures.AdminFixture, title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
+	editorProvider := h.activeEditorProvider(ctx)
 	fields := h.formFieldsFromFixture(bundle, "content-editor", []blocks.FieldData{
 		{ID: "title", Name: "title", Label: "Title", Value: entry.Title.Value("en", "en"), Required: true},
 		{ID: "slug", Name: "slug", Label: "Slug", Value: entry.Slug.Value("en", "en"), Required: true},
-		{ID: "content", Name: "content", Label: "Content", Value: entry.Body.Value("en", "en"), Component: "textarea", Rows: 8},
+		{
+			ID: "content", Name: "content", Label: "Content", Value: entry.Body.Value("en", "en"),
+			Component: "richtext", Rows: 12, Hint: "HTML is stored in the content field; the editor provider can be swapped later.",
+			Editor: &blocks.EditorData{ProviderID: editorProvider.ID},
+		},
 		{ID: "excerpt", Name: "excerpt", Label: "Excerpt", Value: entry.Excerpt.Value("en", "en"), Component: "textarea", Rows: 3},
 		{ID: "author_id", Name: "author_id", Label: "Author ID", Value: defaultValue(entry.AuthorID, "author-1")},
 		{ID: "featured_media_id", Name: "featured_media_id", Label: "Featured media ID", Value: entry.FeaturedMediaID},
@@ -1196,7 +1217,7 @@ func (h Handler) formFieldsFromFixture(bundle adminfixtures.AdminFixture, key st
 	if !ok || len(form.Fields) == 0 {
 		return fallback
 	}
-	return h.formFields(form.Fields)
+	return mergeFixtureFields(h.formFields(form.Fields), fallback)
 }
 
 func (h Handler) formFields(fields []adminfixtures.FieldFixture) []blocks.FieldData {
@@ -1213,6 +1234,62 @@ func (h Handler) formFields(fields []adminfixtures.FieldFixture) []blocks.FieldD
 			Required:    field.Required,
 			Rows:        field.Rows,
 		})
+	}
+	return result
+}
+
+func mergeFixtureFields(fields []blocks.FieldData, fallback []blocks.FieldData) []blocks.FieldData {
+	if len(fallback) == 0 {
+		return fields
+	}
+	index := make(map[string]blocks.FieldData, len(fallback))
+	for _, field := range fallback {
+		if field.ID != "" {
+			index[field.ID] = field
+		}
+		if field.Name != "" {
+			index[field.Name] = field
+		}
+	}
+	result := make([]blocks.FieldData, 0, len(fields))
+	for _, field := range fields {
+		override, ok := index[field.ID]
+		if !ok && field.Name != "" {
+			override, ok = index[field.Name]
+		}
+		if !ok {
+			result = append(result, field)
+			continue
+		}
+		if override.Name != "" {
+			field.Name = override.Name
+		}
+		if override.Value != "" {
+			field.Value = override.Value
+		}
+		if override.Type != "" {
+			field.Type = override.Type
+		}
+		if override.Component != "" {
+			field.Component = override.Component
+		}
+		if override.Placeholder != "" {
+			field.Placeholder = override.Placeholder
+		}
+		field.Required = field.Required || override.Required
+		if override.Rows > 0 {
+			field.Rows = override.Rows
+		}
+		if len(override.Options) > 0 {
+			field.Options = override.Options
+		}
+		if override.Hint != "" {
+			field.Hint = override.Hint
+		}
+		if override.Editor != nil {
+			field.Editor = override.Editor
+		}
+		result = append(result, field)
 	}
 	return result
 }
@@ -1275,6 +1352,20 @@ func updateFieldValue(fields []blocks.FieldData, id string, value string) {
 			fields[i].Value = value
 			return
 		}
+	}
+}
+
+func (h Handler) activeEditorProvider(ctx context.Context) plugins.EditorProviderRegistration {
+	configured := h.settingValue(ctx, editorProviderSettingKey, defaultEditorProviderID)
+	provider, ok := h.registry.ResolveEditorProvider(configured)
+	if ok {
+		return provider
+	}
+	return plugins.EditorProviderRegistration{
+		ID:          defaultEditorProviderID,
+		Label:       "TipTap (Basic)",
+		Description: "Built-in TipTap editor with starter formatting extensions and HTML storage.",
+		Priority:    0,
 	}
 }
 
