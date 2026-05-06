@@ -99,6 +99,7 @@ func DevBearerPrincipals() map[string]domainauthz.Principal {
 			domainauthz.CapabilityTaxonomiesAssign,
 			domainauthz.CapabilityMenusManage,
 			domainauthz.CapabilitySettingsManage,
+			domainauthz.CapabilityThemesManage,
 			domainauthz.CapabilityUsersManage,
 			domainauthz.CapabilityRolesManage,
 		),

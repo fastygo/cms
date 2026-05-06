@@ -124,13 +124,39 @@ func Seed(ctx context.Context, store Store) error {
 		}
 	}
 
-	return store.SaveMenu(ctx, domainmenus.Menu{
+	if err := store.SaveMenu(ctx, domainmenus.Menu{
 		ID:       "menu-primary",
 		Name:     "Primary",
 		Location: "primary",
 		Items: []domainmenus.Item{
 			{ID: "menu-home", Label: "Home", URL: "/"},
-			{ID: "menu-blog", Label: "Blog", URL: "/blog"},
+			{
+				ID:    "menu-blog",
+				Label: "Blog",
+				URL:   "/blog/",
+				Children: []domainmenus.Item{
+					{ID: "menu-blog-news", Label: "News", URL: "/category/news/"},
+				},
+			},
+			{ID: "menu-about", Label: "About", URL: "/about/"},
+		},
+	}); err != nil {
+		return err
+	}
+	return store.SaveMenu(ctx, domainmenus.Menu{
+		ID:       "menu-footer",
+		Name:     "Footer",
+		Location: "footer",
+		Items: []domainmenus.Item{
+			{ID: "menu-footer-home", Label: "Home", URL: "/"},
+			{
+				ID:    "menu-footer-resources",
+				Label: "Resources",
+				URL:   "/blog/",
+				Children: []domainmenus.Item{
+					{ID: "menu-footer-author", Label: "Author Jane", URL: "/author/jane/"},
+				},
+			},
 		},
 	})
 }

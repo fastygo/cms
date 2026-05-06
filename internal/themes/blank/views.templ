@@ -1,0 +1,46 @@
+package blank
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/application/publicrender"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+	ui8layout "github.com/fastygo/ui8kit/layout"
+	"github.com/fastygo/ui8kit/ui"
+)
+
+templ ThemePage(data publicrender.PublicPage) {
+	@ui8layout.Shell(ui8layout.ShellProps{
+		Title:          data.Layout.Title,
+		Lang:           data.Layout.Lang,
+		BrandName:      data.Layout.Brand,
+		Active:         data.Layout.ActivePath,
+		CSSPath:        data.Layout.Assets.Base.CSS,
+		ThemeJSPath:    data.Layout.Assets.Base.ThemeJS,
+		AppJSPath:      data.Layout.Assets.Base.AppJS,
+		MarketingShell: true,
+	}) {
+		@elements.MarkerMain(elements.MarkerProps{
+			Class: "gocms-public-main",
+			Attrs: templpkg.Attributes{
+				"data-gocms-public-screen": data.Screen,
+				"data-gocms-theme":         "blank",
+			},
+		}) {
+			@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+				@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+					@ui.Badge(ui.BadgeProps{Variant: "outline"}, "Blank theme")
+					@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+					if data.Description != "" {
+						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Description)
+					}
+					if data.Content != "" {
+						@ui.Text(ui.TextProps{LineHeight: "relaxed"}, data.Content)
+					}
+					for _, item := range data.Items {
+						@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "link"}, item.Title)
+					}
+				}
+			}
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,8 +24,11 @@ import (
 	domainmenus "github.com/fastygo/cms/internal/domain/menus"
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
+	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
 	"github.com/fastygo/cms/internal/platform/plugins"
+	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/assets"
 	"github.com/fastygo/cms/internal/site/ui/blocks"
@@ -56,6 +60,7 @@ type Handler struct {
 	playgroundAuth bool
 	loginPolicy    string
 	runtimeInfo    RuntimeInfo
+	themeRegistry  *platformthemes.Registry
 }
 
 type RuntimeInfo struct {
@@ -77,6 +82,7 @@ type HandlerOptions struct {
 	PlaygroundAuth bool
 	LoginPolicy    string
 	RuntimeInfo    RuntimeInfo
+	ThemeRegistry  *platformthemes.Registry
 }
 
 type actionToken struct {
@@ -109,6 +115,10 @@ func NewHandlerWithOptions(services Services, authenticator rest.Authenticator, 
 		playgroundAuth: options.PlaygroundAuth,
 		loginPolicy:    options.LoginPolicy,
 		runtimeInfo:    options.RuntimeInfo,
+		themeRegistry:  options.ThemeRegistry,
+	}
+	if handler.themeRegistry == nil {
+		handler.themeRegistry = platformthemes.DefaultRegistry()
 	}
 	handler.registerCoreScreens()
 	return handler
@@ -127,8 +137,10 @@ func (h Handler) registerCoreScreens() {
 		{ID: "authors", Label: "Authors", Path: "/go-admin/authors", Icon: "users", Order: 8, Capability: authz.CapabilityContentReadPrivate},
 		{ID: "capabilities", Label: "Roles and capabilities", Path: "/go-admin/capabilities", Icon: "shield", Order: 9, Capability: authz.CapabilityRolesManage},
 		{ID: "settings", Label: "Settings", Path: "/go-admin/settings", Icon: "sliders", Order: 10, Capability: authz.CapabilitySettingsManage},
-		{ID: "headless", Label: "API and headless settings", Path: "/go-admin/headless", Icon: "server", Order: 11, Capability: authz.CapabilitySettingsManage},
-		{ID: "runtime", Label: "Runtime status", Path: "/go-admin/runtime", Icon: "server", Order: 12, Capability: authz.CapabilitySettingsManage},
+		{ID: "themes", Label: "Themes", Path: "/go-admin/themes", Icon: "palette", Order: 11, Capability: authz.CapabilityThemesManage},
+		{ID: "permalinks", Label: "Permalinks", Path: "/go-admin/permalinks", Icon: "link", Order: 12, Capability: authz.CapabilitySettingsManage},
+		{ID: "headless", Label: "API and headless settings", Path: "/go-admin/headless", Icon: "server", Order: 13, Capability: authz.CapabilitySettingsManage},
+		{ID: "runtime", Label: "Runtime status", Path: "/go-admin/runtime", Icon: "server", Order: 14, Capability: authz.CapabilitySettingsManage},
 	} {
 		h.registry.AddAdminMenu(item)
 	}
@@ -162,6 +174,10 @@ func (h Handler) registerCoreScreens() {
 		h.coreRoute("GET /go-admin/capabilities", authz.CapabilityRolesManage, h.capabilitiesPage),
 		h.coreRoute("GET /go-admin/settings", authz.CapabilitySettingsManage, h.settingsPage),
 		h.coreRoute("POST /go-admin/settings", authz.CapabilitySettingsManage, h.settingsSave),
+		h.coreRoute("GET /go-admin/themes", authz.CapabilityThemesManage, h.themesPage),
+		h.coreRoute("POST /go-admin/themes", authz.CapabilityThemesManage, h.themesSave),
+		h.coreRoute("GET /go-admin/permalinks", authz.CapabilitySettingsManage, h.permalinksPage),
+		h.coreRoute("POST /go-admin/permalinks", authz.CapabilitySettingsManage, h.permalinksSave),
 		h.coreRoute("GET /go-admin/headless", authz.CapabilitySettingsManage, h.headlessPage),
 		h.coreRoute("GET /go-admin/runtime", authz.CapabilitySettingsManage, h.runtimePage),
 	)
@@ -655,9 +671,11 @@ func (h Handler) capabilitiesPage(w http.ResponseWriter, r *http.Request, princi
 
 func (h Handler) settingsPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
 	fixture := h.fixture(r)
+	siteTitle := h.settingValue(r.Context(), "site.title", "GoCMS")
+	publicRendering := h.settingValue(r.Context(), "public.rendering", h.defaultPublicRendering())
 	form := h.contentEditorFromFixture(fixture, "settings", "/go-admin/settings", h.token("settings-write"), []blocks.FieldData{
-		{ID: "site_title", Name: "site_title", Label: fixture.Label("field_site_title", "Site title"), Value: "GoCMS", Required: true},
-		{ID: "public_rendering", Name: "public_rendering", Label: fixture.Label("field_public_rendering", "Public rendering"), Value: "disabled"},
+		{ID: "site_title", Name: "site_title", Label: fixture.Label("field_site_title", "Site title"), Value: siteTitle, Required: true},
+		{ID: "public_rendering", Name: "public_rendering", Label: fixture.Label("field_public_rendering", "Public rendering"), Value: publicRendering},
 	})
 	screen, _ := fixture.Screen("settings")
 	title := fallbackValue(screen.Title, "Settings")
@@ -689,6 +707,113 @@ func (h Handler) settingsSave(w http.ResponseWriter, r *http.Request, principal 
 		}
 	}
 	http.Redirect(w, r, "/go-admin/settings", http.StatusSeeOther)
+}
+
+func (h Handler) themesPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
+	activeID := h.settingValue(r.Context(), platformthemes.ActiveThemeKey, string(platformthemes.DefaultThemeID))
+	activePreset := h.themeRegistry.ResolvePreset(activeID, h.settingValue(r.Context(), platformthemes.StylePresetKey, "default")).ID
+	previewTheme := h.settingValue(r.Context(), platformthemes.PreviewThemeKey, activeID)
+	previewPreset := h.settingValue(r.Context(), "theme.preview_preset", activePreset)
+	items := h.themeRegistry.List()
+	rows := make([]blocks.SimpleListRow, 0, len(items))
+	for _, item := range items {
+		status := "inactive"
+		if string(item.ID) == activeID {
+			status = "active"
+		}
+		presets := h.themeRegistry.ListPresets(string(item.ID))
+		previewURL := "/?preview_theme=" + string(item.ID)
+		if len(presets) > 0 {
+			previewURL += "&preview_preset=" + presets[0].ID
+		}
+		rows = append(rows, blocks.SimpleListRow{
+			Label:       item.Name,
+			Description: item.Version + " | contract " + item.Contract + " | roles " + strings.Join(themeRoles(item), ", ") + " | presets " + strings.Join(themePresetIDs(presets), ", ") + " | preview " + previewURL,
+			Status:      status,
+		})
+	}
+	form := h.contentEditorFromFixture(fixture, "themes", "/go-admin/themes", h.token("admin-write"), []blocks.FieldData{
+		{ID: "theme_active", Name: "theme_active", Label: fixture.Label("field_theme_active", "Active theme"), Value: activeID, Required: true},
+		{ID: "theme_style_preset", Name: "theme_style_preset", Label: fixture.Label("field_theme_style_preset", "Style preset"), Value: activePreset, Required: true},
+		{ID: "theme_preview", Name: "theme_preview", Label: fixture.Label("field_theme_preview", "Preview theme"), Value: previewTheme},
+		{ID: "theme_preview_preset", Name: "theme_preview_preset", Label: fixture.Label("field_theme_preview_preset", "Preview preset"), Value: previewPreset},
+	})
+	updateFieldValue(form.Fields, "theme_active", activeID)
+	updateFieldValue(form.Fields, "theme_style_preset", activePreset)
+	updateFieldValue(form.Fields, "theme_preview", previewTheme)
+	updateFieldValue(form.Fields, "theme_preview_preset", previewPreset)
+	screen, _ := fixture.Screen("themes")
+	title := fallbackValue(screen.Title, "Themes")
+	description := fallbackValue(screen.Description, "Inspect installed themes, choose the active theme, and select a style preset.")
+	form.Title = title
+	form.Description = description
+	h.renderSimple(w, r, principal, "themes", fixture, rows, "themes", form.Fields, "/go-admin/themes")
+}
+
+func (h Handler) themesSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	if err := r.ParseForm(); err != nil || !h.validToken(r.PostForm.Get("action_token"), "admin-write") {
+		http.Error(w, "Invalid theme submission.", http.StatusBadRequest)
+		return
+	}
+	activeTheme := h.themeRegistry.ResolveActive(r.PostForm.Get("theme_active")).Manifest().ID
+	activePreset := h.themeRegistry.ResolvePreset(string(activeTheme), r.PostForm.Get("theme_style_preset")).ID
+	previewTheme := h.themeRegistry.ResolveActive(r.PostForm.Get("theme_preview")).Manifest().ID
+	previewPreset := h.themeRegistry.ResolvePreset(string(previewTheme), r.PostForm.Get("theme_preview_preset")).ID
+	for _, value := range []domainsettings.Value{
+		{Key: domainsettings.Key(platformthemes.ActiveThemeKey), Value: string(activeTheme), Public: false},
+		{Key: domainsettings.Key(platformthemes.StylePresetKey), Value: activePreset, Public: false},
+		{Key: domainsettings.Key(platformthemes.PreviewThemeKey), Value: string(previewTheme), Public: false},
+		{Key: "theme.preview_preset", Value: previewPreset, Public: false},
+	} {
+		if err := h.services.Settings.Save(r.Context(), principal, value); err != nil {
+			http.Error(w, err.Error(), statusFromError(err))
+			return
+		}
+	}
+	http.Redirect(w, r, "/go-admin/themes", http.StatusSeeOther)
+}
+
+func (h Handler) permalinksPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
+	postPattern := h.settingValue(r.Context(), "permalinks.post_pattern", "/%postname%/")
+	pagePattern := h.settingValue(r.Context(), "permalinks.page_pattern", "/{slug}/")
+	form := h.contentEditorFromFixture(fixture, "permalinks", "/go-admin/permalinks", h.token("permalinks-write"), []blocks.FieldData{
+		{ID: "post_pattern", Name: "post_pattern", Label: fixture.Label("field_post_pattern", "Post permalink pattern"), Value: postPattern, Required: true, Placeholder: "/%postname%/"},
+		{ID: "page_pattern", Name: "page_pattern", Label: fixture.Label("field_page_pattern", "Page permalink pattern"), Value: pagePattern, Required: true, Placeholder: "/{slug}/"},
+	})
+	updateFieldValue(form.Fields, "post_pattern", postPattern)
+	updateFieldValue(form.Fields, "page_pattern", pagePattern)
+	screen, _ := fixture.Screen("permalinks")
+	title := fallbackValue(screen.Title, "Permalinks")
+	description := fallbackValue(screen.Description, "Configure public routes for posts and pages.")
+	form.Actions = h.screenActions("permalinks", fixture)
+	form.Title = title
+	form.Description = description
+	_ = web.Render(r.Context(), w, views.SettingsPage(views.SettingsPageData{
+		Layout:      h.layout(r, principal, title, "/go-admin/permalinks"),
+		Screen:      "permalinks",
+		Form:        form,
+		Title:       title,
+		Description: description,
+	}))
+}
+
+func (h Handler) permalinksSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	if err := r.ParseForm(); err != nil || !h.validToken(r.PostForm.Get("action_token"), "permalinks-write") {
+		http.Error(w, "Invalid permalink submission.", http.StatusBadRequest)
+		return
+	}
+	for _, value := range []domainsettings.Value{
+		{Key: "permalinks.post_pattern", Value: r.PostForm.Get("post_pattern"), Public: false},
+		{Key: "permalinks.page_pattern", Value: r.PostForm.Get("page_pattern"), Public: false},
+	} {
+		if err := h.services.Settings.Save(r.Context(), principal, value); err != nil {
+			http.Error(w, err.Error(), statusFromError(err))
+			return
+		}
+	}
+	http.Redirect(w, r, "/go-admin/permalinks", http.StatusSeeOther)
 }
 
 func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -733,7 +858,7 @@ func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal 
 	title := fallbackValue(screenData.Title, titleFor(screen))
 	description := fallbackValue(screenData.Description, "Manage admin content.")
 	actions := []elements.Action{}
-	if screen == "headless" || screen == "settings" {
+	if screen == "headless" || screen == "settings" || screen == "themes" {
 		actions = h.screenActions(screen, bundle)
 	}
 	data := views.SimpleListPageData{
@@ -1043,6 +1168,24 @@ func valueOrUnset(value string) string {
 	return value
 }
 
+func (h Handler) settingValue(ctx context.Context, key string, fallback string) string {
+	value, ok, err := h.services.Settings.Get(ctx, domainsettings.Key(key))
+	if err != nil || !ok {
+		return fallback
+	}
+	if raw, ok := value.Value.(string); ok && strings.TrimSpace(raw) != "" {
+		return raw
+	}
+	return fallback
+}
+
+func (h Handler) defaultPublicRendering() string {
+	if strings.EqualFold(h.runtimeInfo.RuntimeProfile, string(runtimeprofile.RuntimeProfileFull)) {
+		return "enabled"
+	}
+	return "disabled"
+}
+
 func (h Handler) simpleFields(r *http.Request, screen string) []blocks.FieldData {
 	bundle := h.fixture(r)
 	return h.formFieldsFromFixture(bundle, screen, nil)
@@ -1133,6 +1276,24 @@ func updateFieldValue(fields []blocks.FieldData, id string, value string) {
 			return
 		}
 	}
+}
+
+func themeRoles(manifest domainthemes.Manifest) []string {
+	roles := make([]string, 0, len(manifest.Templates))
+	for role := range manifest.Templates {
+		roles = append(roles, string(role))
+	}
+	slices.Sort(roles)
+	return roles
+}
+
+func themePresetIDs(items []domainthemes.StylePreset) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 func statusFromError(err error) int {

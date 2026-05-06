@@ -1,0 +1,5 @@
+/* BrandOSS-style bold tech preset tokens. */
+:root {
+  --gocms-brand-accent: #2563eb;
+  --gocms-brand-surface: #0f172a;
+}

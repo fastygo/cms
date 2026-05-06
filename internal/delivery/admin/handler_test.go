@@ -191,6 +191,101 @@ func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	}
 }
 
+func TestAdminThemesAndPermalinksAreCapabilityGated(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	viewerThemes := httptest.NewRecorder()
+	viewerThemesReq := httptest.NewRequest(http.MethodGet, "/go-admin/themes", nil)
+	viewerThemesReq.Header.Set("Authorization", "Bearer viewer-token")
+	mux.ServeHTTP(viewerThemes, viewerThemesReq)
+	if viewerThemes.Code != http.StatusForbidden {
+		t.Fatalf("expected viewer themes forbidden, got %d", viewerThemes.Code)
+	}
+
+	adminThemes := httptest.NewRecorder()
+	adminThemesReq := httptest.NewRequest(http.MethodGet, "/go-admin/themes", nil)
+	adminThemesReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(adminThemes, adminThemesReq)
+	if adminThemes.Code != http.StatusOK {
+		t.Fatalf("expected admin themes page, got %d: %s", adminThemes.Code, adminThemes.Body.String())
+	}
+	body := adminThemes.Body.String()
+	for _, expected := range []string{`data-gocms-screen="themes"`, "GoCMS Default", "front", "active", "bold-tech", "preview_theme"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected themes page to contain %q", expected)
+		}
+	}
+	themesToken := extractToken(t, body)
+
+	saveThemes := httptest.NewRecorder()
+	saveThemesForm := url.Values{
+		"action_token":         {themesToken},
+		"theme_active":         {"blank"},
+		"theme_style_preset":   {"minimal"},
+		"theme_preview":        {"gocms-default"},
+		"theme_preview_preset": {"bold-tech"},
+	}
+	saveThemesReq := httptest.NewRequest(http.MethodPost, "/go-admin/themes", strings.NewReader(saveThemesForm.Encode()))
+	saveThemesReq.Header.Set("Authorization", "Bearer admin-token")
+	saveThemesReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(saveThemes, saveThemesReq)
+	if saveThemes.Code != http.StatusSeeOther {
+		t.Fatalf("expected themes redirect, got %d: %s", saveThemes.Code, saveThemes.Body.String())
+	}
+
+	updatedThemes := httptest.NewRecorder()
+	updatedThemesReq := httptest.NewRequest(http.MethodGet, "/go-admin/themes", nil)
+	updatedThemesReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(updatedThemes, updatedThemesReq)
+	for _, expected := range []string{"blank", "minimal", "bold-tech"} {
+		if !strings.Contains(updatedThemes.Body.String(), expected) {
+			t.Fatalf("expected updated themes page to contain %q", expected)
+		}
+	}
+
+	viewerPermalinks := httptest.NewRecorder()
+	viewerPermalinksReq := httptest.NewRequest(http.MethodGet, "/go-admin/permalinks", nil)
+	viewerPermalinksReq.Header.Set("Authorization", "Bearer viewer-token")
+	mux.ServeHTTP(viewerPermalinks, viewerPermalinksReq)
+	if viewerPermalinks.Code != http.StatusForbidden {
+		t.Fatalf("expected viewer permalinks forbidden, got %d", viewerPermalinks.Code)
+	}
+
+	adminPermalinks := httptest.NewRecorder()
+	adminPermalinksReq := httptest.NewRequest(http.MethodGet, "/go-admin/permalinks", nil)
+	adminPermalinksReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(adminPermalinks, adminPermalinksReq)
+	if adminPermalinks.Code != http.StatusOK {
+		t.Fatalf("expected admin permalinks page, got %d: %s", adminPermalinks.Code, adminPermalinks.Body.String())
+	}
+	token := extractToken(t, adminPermalinks.Body.String())
+
+	save := httptest.NewRecorder()
+	form := url.Values{
+		"action_token": {token},
+		"post_pattern": {"/archives/%id%/"},
+		"page_pattern": {"/pages/{slug}/"},
+	}
+	saveReq := httptest.NewRequest(http.MethodPost, "/go-admin/permalinks", strings.NewReader(form.Encode()))
+	saveReq.Header.Set("Authorization", "Bearer admin-token")
+	saveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(save, saveReq)
+	if save.Code != http.StatusSeeOther {
+		t.Fatalf("expected permalinks redirect, got %d: %s", save.Code, save.Body.String())
+	}
+
+	updated := httptest.NewRecorder()
+	updatedReq := httptest.NewRequest(http.MethodGet, "/go-admin/permalinks", nil)
+	updatedReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(updated, updatedReq)
+	for _, expected := range []string{"/archives/%id%/", "/pages/{slug}/"} {
+		if !strings.Contains(updated.Body.String(), expected) {
+			t.Fatalf("expected permalinks page to contain %q", expected)
+		}
+	}
+}
+
 func TestAdminLoadsPluginActionsAndSnapshotExport(t *testing.T) {
 	mux, closeFn := newAdminMux(t)
 	defer closeFn()

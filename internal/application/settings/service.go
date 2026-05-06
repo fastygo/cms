@@ -29,6 +29,10 @@ func (s Service) Save(ctx context.Context, principal domainauthz.Principal, valu
 	return s.repo.SaveSetting(ctx, value)
 }
 
+func (s Service) Get(ctx context.Context, key domainsettings.Key) (domainsettings.Value, bool, error) {
+	return s.repo.GetSetting(ctx, key)
+}
+
 func (s Service) Public(ctx context.Context) ([]domainsettings.Value, error) {
 	return s.repo.ListPublicSettings(ctx)
 }

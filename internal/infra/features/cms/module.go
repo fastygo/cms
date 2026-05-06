@@ -14,12 +14,14 @@ import (
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
 	"github.com/fastygo/cms/internal/delivery/admin"
+	"github.com/fastygo/cms/internal/delivery/publicsite"
 	"github.com/fastygo/cms/internal/delivery/rest"
 	"github.com/fastygo/cms/internal/domain/authz"
 	"github.com/fastygo/cms/internal/infra/bootstrap"
 	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/platform/preset"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	graphqlplugin "github.com/fastygo/cms/internal/plugins/graphql"
 	jsonplugin "github.com/fastygo/cms/internal/plugins/jsonimportexport"
 	playgroundplugin "github.com/fastygo/cms/internal/plugins/playground"
@@ -31,6 +33,7 @@ type Module struct {
 	store          bootstrap.Store
 	handler        rest.Handler
 	adminHandler   admin.Handler
+	publicHandler  publicsite.Handler
 	pluginRegistry *platformplugins.Registry
 	contentTypes   appcontenttype.Service
 	seedFixtures   bool
@@ -110,6 +113,7 @@ func NewWithOptions(options Options) (*Module, error) {
 			ProviderSwitchRule: "Export JSON/site package first, change the bootstrap provider through deployment config, restart or redeploy, then import into the new provider.",
 		},
 	}
+	themeRegistry := platformthemes.DefaultRegistry()
 	services := rest.Services{
 		Content:      appcontent.NewService(bootstrapRuntime.Store, bootstrapRuntime.Store, time.Now),
 		ContentTypes: module.contentTypes,
@@ -166,7 +170,16 @@ func NewWithOptions(options Options) (*Module, error) {
 		PlaygroundAuth: options.PlaygroundAuth,
 		LoginPolicy:    defaultString(options.LoginPolicy, "fixture"),
 		RuntimeInfo:    module.runtimeInfo,
+		ThemeRegistry:  themeRegistry,
 	})
+	module.publicHandler = publicsite.New(publicsite.Services{
+		Content:  services.Content,
+		Media:    services.Media,
+		Menus:    services.Menus,
+		Settings: services.Settings,
+		Taxonomy: services.Taxonomy,
+		Users:    services.Users,
+	}, themeRegistry)
 	if err := module.Init(context.Background()); err != nil {
 		_ = bootstrapRuntime.Store.Close(context.Background())
 		return nil, err
@@ -191,6 +204,9 @@ func (m *Module) Routes(mux *http.ServeMux) {
 		m.adminHandler.Register(mux)
 	}
 	if m.pluginRegistry == nil {
+		if m.exposesPublic() {
+			m.publicHandler.Register(mux)
+		}
 		return
 	}
 	if m.exposesREST() {
@@ -200,6 +216,9 @@ func (m *Module) Routes(mux *http.ServeMux) {
 	}
 	for _, route := range m.pluginRegistry.RoutesForSurface(platformplugins.SurfacePublic) {
 		mux.HandleFunc(route.Pattern, route.Handler)
+	}
+	if m.exposesPublic() {
+		m.publicHandler.Register(mux)
 	}
 }
 
@@ -250,6 +269,10 @@ func (m *Module) exposesAdmin() bool {
 	default:
 		return true
 	}
+}
+
+func (m *Module) exposesPublic() bool {
+	return m.runtimeProfile == string(runtimeprofile.RuntimeProfileFull)
 }
 
 func defaultString(value string, fallback string) string {

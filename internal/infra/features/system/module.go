@@ -21,9 +21,9 @@ func (Module) ID() string {
 	return "system"
 }
 
-// Routes registers pass-0 system routes.
+// Routes registers system diagnostics routes without competing with the public site root.
 func (Module) Routes(mux *http.ServeMux) {
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/go-system", func(w http.ResponseWriter, _ *http.Request) {
 		_ = web.WriteJSON(w, http.StatusOK, map[string]string{
 			"name":   "GoCMS",
 			"status": "pass0",

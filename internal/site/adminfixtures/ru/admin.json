@@ -123,6 +123,18 @@
         "singular": "Настройка",
         "form_description": "Обновите настройки сайта."
       },
+      "themes": {
+        "title": "Темы",
+        "description": "Проверьте активную встроенную тему и доступные роли шаблонов.",
+        "singular": "Тема",
+        "form_description": "Просмотрите активную публичную тему."
+      },
+      "permalinks": {
+        "title": "Постоянные ссылки",
+        "description": "Настройте публичные маршруты записей и страниц.",
+        "singular": "Настройка permalink",
+        "form_description": "Обновите шаблоны публичных ссылок."
+      },
       "headless": {
         "title": "API и headless-настройки",
         "description": "Проверьте режим доставки API и статус плагинов.",
@@ -200,6 +212,12 @@
           {"id": "public_rendering", "name": "public_rendering", "label": "Публичная отрисовка", "value": "disabled", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
         ]
       },
+      "permalinks": {
+        "fields": [
+          {"id": "post_pattern", "name": "post_pattern", "label": "Шаблон ссылки записи", "value": "/%postname%/", "type": "text", "component": "", "placeholder": "/%postname%/", "required": true, "rows": 0},
+          {"id": "page_pattern", "name": "page_pattern", "label": "Шаблон ссылки страницы", "value": "/{slug}/", "type": "text", "component": "", "placeholder": "/{slug}/", "required": true, "rows": 0}
+        ]
+      },
       "playground": {
         "fields": []
       }
@@ -218,6 +236,8 @@
       "field_password": "Пароль",
       "field_site_title": "Заголовок сайта",
       "field_public_rendering": "Публичная отрисовка",
+      "field_post_pattern": "Шаблон ссылки записи",
+      "field_page_pattern": "Шаблон ссылки страницы",
       "field_status": "Статус",
       "panel_publish": "Публикация",
       "table_title": "Заголовок",

@@ -1,0 +1,4 @@
+/* Minimal starter preset tokens. */
+:root {
+  --gocms-brand-accent: hsl(var(--muted-foreground));
+}

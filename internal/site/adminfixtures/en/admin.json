@@ -123,6 +123,18 @@
         "singular": "Setting",
         "form_description": "Update site-level configuration."
       },
+      "themes": {
+        "title": "Themes",
+        "description": "Inspect the active built-in theme contract and available template roles.",
+        "singular": "Theme",
+        "form_description": "Review the active public theme."
+      },
+      "permalinks": {
+        "title": "Permalinks",
+        "description": "Configure public post and page routes.",
+        "singular": "Permalink setting",
+        "form_description": "Update public permalink patterns."
+      },
       "headless": {
         "title": "API and headless settings",
         "description": "Inspect API delivery mode and upcoming plugin state.",
@@ -200,6 +212,12 @@
           {"id": "public_rendering", "name": "public_rendering", "label": "Public rendering", "value": "disabled", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
         ]
       },
+      "permalinks": {
+        "fields": [
+          {"id": "post_pattern", "name": "post_pattern", "label": "Post permalink pattern", "value": "/%postname%/", "type": "text", "component": "", "placeholder": "/%postname%/", "required": true, "rows": 0},
+          {"id": "page_pattern", "name": "page_pattern", "label": "Page permalink pattern", "value": "/{slug}/", "type": "text", "component": "", "placeholder": "/{slug}/", "required": true, "rows": 0}
+        ]
+      },
       "playground": {
         "fields": []
       }
@@ -218,6 +236,8 @@
       "field_password": "Password",
       "field_site_title": "Site title",
       "field_public_rendering": "Public rendering",
+      "field_post_pattern": "Post permalink pattern",
+      "field_page_pattern": "Page permalink pattern",
       "field_status": "Status",
       "panel_publish": "Publish",
       "table_title": "Title",

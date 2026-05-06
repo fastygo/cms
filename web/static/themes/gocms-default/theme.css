@@ -1,0 +1,8 @@
+/* GoCMS default theme contract asset. */
+.gocms-public-header[data-gocms-public-header="gocms-default"] {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.gocms-public-footer[data-gocms-public-footer="gocms-default"] {
+  border-top: 1px solid hsl(var(--border));
+}

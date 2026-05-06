@@ -1,0 +1,353 @@
+package gocmsdefault
+
+import (
+	"strings"
+
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/application/publicrender"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+	"github.com/fastygo/cms/internal/site/ui/elements/toggles"
+	ui8layout "github.com/fastygo/ui8kit/layout"
+	"github.com/fastygo/ui8kit/ui"
+)
+
+templ ThemePage(data publicrender.PublicPage) {
+	@ui8layout.Shell(ui8layout.ShellProps{
+		Title:          data.Layout.Title,
+		Lang:           data.Layout.Lang,
+		BrandName:      data.Layout.Brand,
+		Active:         data.Layout.ActivePath,
+		CSSPath:        data.Layout.Assets.Base.CSS,
+		ThemeJSPath:    data.Layout.Assets.Base.ThemeJS,
+		AppJSPath:      data.Layout.Assets.Base.AppJS,
+		HeadExtra:      themeHead(data),
+		HeaderExtra:    toggles.LanguageToggle(data.Layout.Language),
+		ThemeToggle: ui8layout.ThemeToggleProps{
+			Label:              data.Layout.ThemeToggle.Label,
+			SwitchToDarkLabel:  data.Layout.ThemeToggle.SwitchToDarkLabel,
+			SwitchToLightLabel: data.Layout.ThemeToggle.SwitchToLightLabel,
+		},
+		MarketingShell: true,
+	}) {
+		@siteHeader(data.Layout)
+		@pageBody(data)
+		@siteFooter(data.Layout)
+	}
+}
+
+templ themeHead(data publicrender.PublicPage) {
+	if data.SEO.CanonicalURL != "" {
+		<link rel="canonical" href={ templpkg.SafeURL(data.SEO.CanonicalURL) }/>
+	}
+	if data.SEO.Description != "" {
+		<meta name="description" content={ data.SEO.Description }/>
+	}
+	if data.SEO.NoIndex {
+		<meta name="robots" content="noindex, nofollow"/>
+	}
+	<meta property="og:type" content={ ogType(data.SEO.Type) }/>
+	if data.SEO.Title != "" {
+		<meta property="og:title" content={ data.SEO.Title }/>
+	}
+	if data.SEO.Description != "" {
+		<meta property="og:description" content={ data.SEO.Description }/>
+	}
+	if data.SEO.CanonicalURL != "" {
+		<meta property="og:url" content={ data.SEO.CanonicalURL }/>
+	}
+	if data.SEO.ImageURL != "" {
+		<meta property="og:image" content={ data.SEO.ImageURL }/>
+	}
+	if data.SEO.PublishedAt != "" {
+		<meta property="article:published_time" content={ data.SEO.PublishedAt }/>
+	}
+	if data.SEO.ModifiedAt != "" {
+		<meta property="article:modified_time" content={ data.SEO.ModifiedAt }/>
+	}
+	for _, stylesheet := range data.Layout.Assets.Stylesheets {
+		<link rel="stylesheet" href={ templpkg.SafeURL(stylesheet) }/>
+	}
+	for _, script := range data.Layout.Assets.Scripts {
+		<script defer src={ templpkg.SafeURL(script) }></script>
+	}
+}
+
+templ siteHeader(layout publicrender.Layout) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-public-header",
+		Attrs: templpkg.Attributes{
+			"data-gocms-public-header": string(layout.ThemeID),
+			"data-gocms-style-preset":  layout.StylePresetID,
+		},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-6"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+				@ui.Group(ui.GroupProps{Class: "justify-between items-start gap-4"}) {
+					@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+						@ui.Title(ui.TitleProps{Order: 2}, layout.Brand)
+						if layout.Tagline != "" {
+							@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Tagline)
+						}
+					}
+					@ui.Badge(ui.BadgeProps{Variant: "outline"}, "Theme: "+string(layout.ThemeID)+" | Preset: "+layout.StylePresetID)
+				}
+				@menuTree(layout.HeaderMenu, "header")
+			}
+		}
+	}
+}
+
+templ siteFooter(layout publicrender.Layout) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-public-footer",
+		Attrs: templpkg.Attributes{"data-gocms-public-footer": string(layout.ThemeID)},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-8"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+				@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Brand)
+				@menuTree(layout.FooterMenu, "footer")
+			}
+		}
+	}
+}
+
+templ pageBody(data publicrender.PublicPage) {
+	@elements.MarkerMain(elements.MarkerProps{
+		Class: "gocms-public-main",
+		Attrs: templpkg.Attributes{
+			"data-gocms-public-screen": data.Screen,
+			"data-gocms-theme":         string(data.Layout.ThemeID),
+		},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-8"}) {
+				@breadcrumbs(data.Breadcrumbs)
+				@pageHero(data)
+				switch data.Kind {
+				case publicrender.RenderKindHome, publicrender.RenderKindBlog, publicrender.RenderKindArchive, publicrender.RenderKindTaxonomy, publicrender.RenderKindAuthor, publicrender.RenderKindSearch:
+					@archiveItems(data.Items)
+					@pagination(data.Pagination)
+				case publicrender.RenderKindPost, publicrender.RenderKindPage:
+					@featuredMedia(data.Featured)
+					@ifText(data.Content)
+					@contentMeta(data)
+					@relatedItems(data.RelatedItems)
+				default:
+					if data.ActionLabel != "" {
+						@ui.Button(ui.ButtonProps{Href: "/", Variant: "outline"}, data.ActionLabel)
+					}
+				}
+			}
+		}
+	}
+}
+
+templ pageHero(data publicrender.PublicPage) {
+	@ui.Block(ui.BlockProps{Tag: "section"}) {
+		@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+			@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+			if data.Description != "" {
+				@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+			}
+			if data.Query != "" {
+				@ui.Badge(ui.BadgeProps{Variant: "outline"}, `Query: "`+data.Query+`"`)
+			}
+			if data.Author != nil {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "Author: "+data.Author.DisplayName)
+			}
+			if len(data.Terms) > 0 {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(data.Terms))
+			}
+			if data.Published != "" {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Published)
+			}
+		}
+	}
+}
+
+templ contentMeta(data publicrender.PublicPage) {
+	@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+		if data.Author != nil && (data.Author.Bio != "" || data.Author.AvatarURL != "") {
+			@ui.Block(ui.BlockProps{Tag: "section"}) {
+				@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+					@ui.Title(ui.TitleProps{Order: 3}, "Author")
+					@ui.Text(ui.TextProps{}, data.Author.DisplayName)
+					if data.Author.Bio != "" {
+						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Author.Bio)
+					}
+					if data.Author.AvatarURL != "" {
+						<img src={ templpkg.SafeURL(data.Author.AvatarURL) } alt={ data.Author.DisplayName } class="max-h-20 w-auto rounded-md"/>
+					}
+				}
+			}
+		}
+		if data.CanonicalURL != "" {
+			@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.CanonicalURL)
+		}
+	}
+}
+
+templ featuredMedia(item *publicrender.MediaView) {
+	if item != nil && item.URL != "" {
+		@ui.Block(ui.BlockProps{Tag: "figure"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+				<img src={ templpkg.SafeURL(item.URL) } alt={ item.AltText } class="w-full rounded-lg border border-border"/>
+				if item.Caption != "" {
+					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Caption)
+				}
+			}
+		}
+	}
+}
+
+templ archiveItems(items []publicrender.ArchiveItem) {
+	@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+		if len(items) == 0 {
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, "No public content is available yet.")
+		}
+		for _, item := range items {
+			@elements.MarkerSection(elements.MarkerProps{
+				Class: "gocms-public-card",
+				Attrs: templpkg.Attributes{"data-gocms-public-item": item.Href},
+			}) {
+				@ui.Container(ui.ContainerProps{}) {
+					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+						@ui.Group(ui.GroupProps{Class: "justify-between items-start gap-4"}) {
+							@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+								@ui.Title(ui.TitleProps{Order: 3}, item.Title)
+								if item.Summary != "" {
+									@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, item.Summary)
+								}
+								if item.Meta != "" {
+									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Meta)
+								}
+								if item.Author != nil {
+									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "By "+item.Author.DisplayName)
+								}
+								if len(item.Terms) > 0 {
+									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(item.Terms))
+								}
+							}
+							@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "outline"}, "Open")
+						}
+						@featuredMedia(item.Featured)
+					}
+				}
+			}
+		}
+	}
+}
+
+templ relatedItems(items []publicrender.ArchiveItem) {
+	if len(items) > 0 {
+		@ui.Block(ui.BlockProps{Tag: "section"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+				@ui.Title(ui.TitleProps{Order: 3}, "Related")
+				@archiveItems(items)
+			}
+		}
+	}
+}
+
+templ breadcrumbs(items []publicrender.Breadcrumb) {
+	if len(items) > 0 {
+		@elements.MarkerSection(elements.MarkerProps{
+			Class: "gocms-public-breadcrumbs",
+			Attrs: templpkg.Attributes{"data-gocms-breadcrumbs": "public"},
+		}) {
+			@ui.Group(ui.GroupProps{Class: "flex-wrap gap-2"}) {
+				for i, item := range items {
+					if item.URL != "" {
+						@ui.Button(ui.ButtonProps{Href: item.URL, Variant: "link"}, item.Label)
+					} else {
+						@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Label)
+					}
+					if i < len(items)-1 {
+						@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "/")
+					}
+				}
+			}
+		}
+	}
+}
+
+templ menuTree(items []publicrender.MenuItem, location string) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-public-menu",
+		Attrs: templpkg.Attributes{"data-gocms-menu-location": location},
+	}) {
+		@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+			if len(items) == 0 {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "No menu items configured.")
+			}
+			for _, item := range items {
+				@menuItem(item, 0)
+			}
+		}
+	}
+}
+
+templ menuItem(item publicrender.MenuItem, depth int) {
+	@ui.Stack(ui.StackProps{Class: menuIndent(depth)}) {
+		@ui.Button(ui.ButtonProps{Href: item.URL, Variant: menuVariant(item.Active)}, item.Label)
+		for _, child := range item.Children {
+			@menuItem(child, depth+1)
+		}
+	}
+}
+
+templ pagination(data publicrender.Pagination) {
+	if data.TotalPages > 1 {
+		@elements.PaginationControl(elements.PaginationData{
+			Page:          data.Page,
+			TotalPages:    data.TotalPages,
+			BaseHref:      data.BaseHref,
+			PreviousLabel: data.PreviousLabel,
+			NextLabel:     data.NextLabel,
+		})
+	}
+}
+
+templ ifText(content string) {
+	if strings.TrimSpace(content) != "" {
+		@ui.Block(ui.BlockProps{Tag: "section"}) {
+			@ui.Text(ui.TextProps{LineHeight: "relaxed"}, content)
+		}
+	}
+}
+
+func ogType(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "website"
+	}
+	return value
+}
+
+func termLabels(items []publicrender.TermView) string {
+	labels := make([]string, 0, len(items))
+	for _, item := range items {
+		label := item.Label
+		if item.Taxonomy != "" {
+			label = item.Taxonomy + ": " + label
+		}
+		labels = append(labels, label)
+	}
+	return strings.Join(labels, " | ")
+}
+
+func menuIndent(depth int) string {
+	if depth <= 0 {
+		return "gap-2"
+	}
+	if depth == 1 {
+		return "gap-2 pl-4"
+	}
+	return "gap-2 pl-8"
+}
+
+func menuVariant(active bool) string {
+	if active {
+		return "default"
+	}
+	return "link"
+}

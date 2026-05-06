@@ -1,0 +1,4 @@
+/* Default style preset tokens. */
+:root {
+  --gocms-brand-accent: hsl(var(--primary));
+}

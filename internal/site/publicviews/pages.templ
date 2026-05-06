@@ -1,0 +1,173 @@
+package publicviews
+
+import (
+	templpkg "github.com/a-h/templ"
+	"github.com/fastygo/cms/internal/site/ui/elements"
+	"github.com/fastygo/cms/internal/site/ui/elements/toggles"
+	"github.com/fastygo/framework/pkg/app"
+	ui8layout "github.com/fastygo/ui8kit/layout"
+	"github.com/fastygo/ui8kit/ui"
+)
+
+templ PublicLayout(data LayoutData, body templpkg.Component) {
+	@ui8layout.Shell(ui8layout.ShellProps{
+		Title:          data.Title,
+		Lang:           data.Lang,
+		BrandName:      data.Brand,
+		Active:         data.Active,
+		NavItems:       shellNavItems(data.NavItems),
+		CSSPath:        data.Assets.CSS,
+		ThemeJSPath:    data.Assets.ThemeJS,
+		AppJSPath:      data.Assets.AppJS,
+		HeaderExtra:    toggles.LanguageToggle(data.Language),
+		ThemeToggle: ui8layout.ThemeToggleProps{
+			Label:              data.Theme.Label,
+			SwitchToDarkLabel:  data.Theme.SwitchToDarkLabel,
+			SwitchToLightLabel: data.Theme.SwitchToLightLabel,
+		},
+		MarketingShell: true,
+	}) {
+		@body
+	}
+}
+
+templ HomePage(data HomePageData) {
+	@PublicLayout(data.Layout, homeBody(data))
+}
+
+templ ArchivePage(data ArchivePageData) {
+	@PublicLayout(data.Layout, archiveBody(data))
+}
+
+templ ContentPage(data ContentPageData) {
+	@PublicLayout(data.Layout, contentBody(data))
+}
+
+templ NotFoundPage(data NotFoundPageData) {
+	@PublicLayout(data.Layout, notFoundBody(data))
+}
+
+templ homeBody(data HomePageData) {
+	@elements.MarkerMain(elements.MarkerProps{
+		Class: "gocms-public-main",
+		Attrs: templpkg.Attributes{"data-gocms-public-screen": "home"},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-8"}) {
+				@ui.Block(ui.BlockProps{Tag: "section"}) {
+					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+						@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+						@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+					}
+				}
+				@archiveItems(data.Items)
+				@elements.PaginationControl(data.Pagination)
+			}
+		}
+	}
+}
+
+templ archiveBody(data ArchivePageData) {
+	@elements.MarkerMain(elements.MarkerProps{
+		Class: "gocms-public-main",
+		Attrs: templpkg.Attributes{"data-gocms-public-screen": data.Screen},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-8"}) {
+				@ui.Block(ui.BlockProps{Tag: "section"}) {
+					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+						@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+						@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+					}
+				}
+				@archiveItems(data.Items)
+				@elements.PaginationControl(data.Pagination)
+			}
+		}
+	}
+}
+
+templ contentBody(data ContentPageData) {
+	@elements.MarkerMain(elements.MarkerProps{
+		Class: "gocms-public-main",
+		Attrs: templpkg.Attributes{"data-gocms-public-screen": data.Screen},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-6"}) {
+				@ui.Block(ui.BlockProps{Tag: "section"}) {
+					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+						@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+						if data.Description != "" {
+							@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+						}
+						if data.Published != "" {
+							@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Published)
+						}
+						if data.CanonicalURL != "" {
+							@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.CanonicalURL)
+						}
+					}
+				}
+				@ui.Block(ui.BlockProps{Tag: "section"}) {
+					@ui.Text(ui.TextProps{LineHeight: "relaxed"}, data.Content)
+				}
+			}
+		}
+	}
+}
+
+templ notFoundBody(data NotFoundPageData) {
+	@elements.MarkerMain(elements.MarkerProps{
+		Class: "gocms-public-main",
+		Attrs: templpkg.Attributes{"data-gocms-public-screen": "not-found"},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-6"}) {
+				@ui.Block(ui.BlockProps{Tag: "section"}) {
+					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
+						@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+						@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+						@ui.Button(ui.ButtonProps{Href: "/", Variant: "outline"}, data.ActionLabel)
+					}
+				}
+			}
+		}
+	}
+}
+
+templ archiveItems(items []ArchiveItemData) {
+	@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+		if len(items) == 0 {
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, "No public content is available yet.")
+		}
+		for _, item := range items {
+			@elements.MarkerSection(elements.MarkerProps{
+				Class: "gocms-public-card",
+				Attrs: templpkg.Attributes{"data-gocms-public-item": item.Href},
+			}) {
+				@ui.Container(ui.ContainerProps{}) {
+					@ui.Group(ui.GroupProps{Class: "justify-between"}) {
+						@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+							@ui.Title(ui.TitleProps{Order: 3}, item.Title)
+							if item.Summary != "" {
+								@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, item.Summary)
+							}
+							if item.Meta != "" {
+								@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Meta)
+							}
+						}
+						@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "outline"}, item.ActionLabel)
+					}
+				}
+			}
+		}
+	}
+}
+
+func shellNavItems(items []app.NavItem) []ui8layout.NavItem {
+	mapped := make([]ui8layout.NavItem, len(items))
+	for i, item := range items {
+		mapped[i] = ui8layout.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon}
+	}
+	return mapped
+}

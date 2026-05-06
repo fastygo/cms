@@ -28,7 +28,7 @@ func TestBuildAppServesHealthAndSystemRoutes(t *testing.T) {
 	}{
 		{name: "liveness", path: cfg.Framework.HealthLivePath},
 		{name: "readiness", path: cfg.Framework.HealthReadyPath},
-		{name: "system", path: "/"},
+		{name: "system", path: "/go-system"},
 		{name: "admin-css", path: "/static/css/app.css"},
 	}
 

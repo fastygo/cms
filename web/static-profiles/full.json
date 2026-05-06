@@ -8,6 +8,8 @@
     "/static/js/snapshots.js"
   ],
   "directories": [
-    "/static/fonts"
+    "/static/fonts",
+    "/static/themes",
+    "/static/presets"
   ]
 }
