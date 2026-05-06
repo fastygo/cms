@@ -20,6 +20,7 @@ import (
 	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/platform/preset"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	graphqlplugin "github.com/fastygo/cms/internal/plugins/graphql"
 	jsonplugin "github.com/fastygo/cms/internal/plugins/jsonimportexport"
 	playgroundplugin "github.com/fastygo/cms/internal/plugins/playground"
 	"github.com/fastygo/cms/internal/runtime/fixtures"
@@ -124,8 +125,22 @@ func NewWithOptions(options Options) (*Module, error) {
 	}
 	authenticator := rest.NewAuthenticatorWithOptions(options.SessionKey, bearerTokens, rest.AuthenticatorOptions{})
 	snapshotService := appsnapshot.NewService(bootstrapRuntime.Store, time.Now)
+	graphqlDescriptor, err := graphqlplugin.New(graphqlplugin.Services{
+		Content:      services.Content,
+		ContentTypes: services.ContentTypes,
+		Taxonomy:     services.Taxonomy,
+		Media:        services.Media,
+		Users:        services.Users,
+		Settings:     services.Settings,
+		Menus:        services.Menus,
+	}, authenticator)
+	if err != nil {
+		_ = bootstrapRuntime.Store.Close(context.Background())
+		return nil, err
+	}
 	pluginRuntime, err := platformplugins.NewRuntime(
 		bootstrapRuntime.PluginState,
+		graphqlDescriptor,
 		jsonplugin.New(snapshotService, bootstrapRuntime.SitePackage),
 		playgroundplugin.New(),
 	)

@@ -693,9 +693,15 @@ func (h Handler) settingsSave(w http.ResponseWriter, r *http.Request, principal 
 
 func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
 	fixture := h.fixture(r)
+	graphqlStatus := "available"
+	graphqlDescription := fixture.Label("headless_graphql_description", "Available through the graphql plugin when activated.")
+	if hasActivePlugin(h.runtimeInfo.ActivePlugins, "graphql") {
+		graphqlStatus = "enabled"
+		graphqlDescription = fixture.Label("headless_graphql_enabled_description", "/go-graphql is enabled through the graphql plugin.")
+	}
 	rows := []blocks.SimpleListRow{
 		{Label: fixture.Label("headless_rest", "REST"), Description: fixture.Label("headless_rest_description", "/go-json/go/v2/ is enabled"), Status: "enabled"},
-		{Label: fixture.Label("headless_graphql", "GraphQL"), Description: fixture.Label("headless_graphql_description", "Planned as Pass 4 plugin"), Status: "planned"},
+		{Label: fixture.Label("headless_graphql", "GraphQL"), Description: graphqlDescription, Status: graphqlStatus},
 		{Label: fixture.Label("headless_rendering", "Public rendering"), Description: fixture.Label("headless_rendering_description", "Can remain disabled for headless mode"), Status: "disabled"},
 	}
 	h.renderSimple(w, r, principal, "headless", fixture, rows, "headless-settings", nil, "")
@@ -983,6 +989,15 @@ func defaultValue(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func hasActivePlugin(plugins []string, id string) bool {
+	for _, pluginID := range plugins {
+		if pluginID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func contentListPath(kind domaincontent.Kind) string {
