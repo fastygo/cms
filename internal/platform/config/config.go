@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fastygo/framework/pkg/app"
+	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 type Config struct {
 	Framework    app.Config
 	SeedFixtures bool
+	RuntimeProfile string
+	StorageProfile string
 }
 
 // Load reads environment configuration and applies GoCMS pass-0 defaults.
@@ -36,8 +39,10 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		Framework:    frameworkConfig,
-		SeedFixtures: parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
+		Framework:      frameworkConfig,
+		SeedFixtures:   parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
+		RuntimeProfile: normalizeRuntimeProfile(os.Getenv("GOCMS_RUNTIME_PROFILE")),
+		StorageProfile: normalizeStorageProfile(os.Getenv("GOCMS_STORAGE_PROFILE")),
 	}, nil
 }
 
@@ -81,6 +86,26 @@ func validate(cfg app.Config) error {
 		return fmt.Errorf("at least one available locale is required")
 	}
 	return nil
+}
+
+func normalizeRuntimeProfile(raw string) string {
+	if raw == "" {
+		return string(runtimeprofile.DefaultRuntimeProfile)
+	}
+	if err := runtimeprofile.ValidateRuntimeProfile(raw); err == nil {
+		return raw
+	}
+	return string(runtimeprofile.DefaultRuntimeProfile)
+}
+
+func normalizeStorageProfile(raw string) string {
+	if raw == "" {
+		return string(runtimeprofile.DefaultStorageProfile)
+	}
+	if err := runtimeprofile.ValidateStorageProfile(raw); err == nil {
+		return raw
+	}
+	return string(runtimeprofile.DefaultStorageProfile)
 }
 
 func parseBool(value string, fallback bool) bool {

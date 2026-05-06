@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	templpkg "github.com/a-h/templ"
 	"github.com/fastygo/cms/internal/site/ui/elements"
+	"github.com/fastygo/cms/internal/site/ui/elements/toggles"
 	"github.com/fastygo/framework/pkg/app"
 	ui8layout "github.com/fastygo/ui8kit/layout"
 	"github.com/fastygo/ui8kit/ui"
@@ -64,11 +65,13 @@ func AdminLayout(data LayoutData, body templpkg.Component) templ.Component {
 			CSSPath:        cssPath(data.Assets),
 			ThemeJSPath:    themeJSPath(data.Assets),
 			AppJSPath:      appJSPath(data.Assets),
+			HeadExtra:      elements.HeadScript(playgroundJSPath(data.Assets)),
+			HeaderExtra:    toggles.LanguageToggle(data.Language),
 			HeaderTrailing: elements.AccountActions(data.Account),
 			ThemeToggle: ui8layout.ThemeToggleProps{
-				Label:              "Theme",
-				SwitchToDarkLabel:  "Switch to dark mode",
-				SwitchToLightLabel: "Switch to light mode",
+				Label:              data.Theme.Label,
+				SwitchToDarkLabel:  data.Theme.SwitchToDarkLabel,
+				SwitchToLightLabel: data.Theme.SwitchToLightLabel,
 			},
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
@@ -244,6 +247,13 @@ func appJSPath(paths AssetPaths) string {
 		return paths.AppJS
 	}
 	return "/static/js/ui8kit.js"
+}
+
+func playgroundJSPath(paths AssetPaths) string {
+	if paths.PlaygroundJS != "" {
+		return paths.PlaygroundJS
+	}
+	return "/static/js/playground.js"
 }
 
 var _ = templruntime.GeneratedTemplate

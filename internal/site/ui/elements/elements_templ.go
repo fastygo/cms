@@ -12,6 +12,7 @@ import (
 	templpkg "github.com/a-h/templ"
 	"github.com/fastygo/ui8kit/ui"
 	"github.com/fastygo/ui8kit/utils"
+	"strings"
 )
 
 func StatusBadge(status string) templ.Component {
@@ -252,7 +253,7 @@ func PaginationControl(data PaginationData) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page-1), Variant: "outline", Disabled: data.Page <= 1}, "Previous").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page-1), Variant: "outline", Disabled: data.Page <= 1}, paginationPreviousLabel(data.PreviousLabel)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -268,7 +269,7 @@ func PaginationControl(data PaginationData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page+1), Variant: "outline", Disabled: data.Page >= data.TotalPages}, "Next").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page+1), Variant: "outline", Disabled: data.Page >= data.TotalPages}, paginationNextLabel(data.NextLabel)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -407,7 +408,7 @@ func AccountActions(data AccountActionsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: "submit", Variant: "outline"}, "Sign out").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: "submit", Variant: "outline"}, accountSignOutLabel(data.SignOutLabel)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -428,6 +429,13 @@ func AccountActions(data AccountActionsData) templ.Component {
 		}
 		return nil
 	})
+}
+
+func accountSignOutLabel(value string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return "Sign out"
 }
 
 var _ = templruntime.GeneratedTemplate

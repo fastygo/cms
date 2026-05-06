@@ -52,3 +52,17 @@ func pageHref(base string, page int) string {
 func pageLabel(page int, total int) string {
 	return fmt.Sprintf("Page %d of %d", page, total)
 }
+
+func paginationPreviousLabel(value string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return "Previous"
+}
+
+func paginationNextLabel(value string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return "Next"
+}

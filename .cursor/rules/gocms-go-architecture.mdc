@@ -15,3 +15,7 @@ alwaysApply: false
 - Avoid hidden mutable globals and package init side effects; wire dependencies in the composition root.
 - Return classified errors that can map cleanly to REST, GraphQL, admin, CLI, and job failure outputs.
 - Comments in code must be written in English.
+- Do not create custom app-owned CSS properties (`--...`) in GoCMS implementation code.
+- Do not add one-off app-owned CSS declarations outside approved token composition.
+- Use only explicit Tailwind utility classes from `E:/_@Go/@GoCMS/.ui8px/policy/allowed.json` and app-owned semantic classes composed through `@apply`.
+- Treat generated CSS/templ/js artifacts as build outputs and do not edit them as source of truth.

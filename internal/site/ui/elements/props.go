@@ -14,9 +14,11 @@ type FieldError struct {
 }
 
 type PaginationData struct {
-	Page       int
-	TotalPages int
-	BaseHref   string
+	Page          int
+	TotalPages    int
+	BaseHref      string
+	PreviousLabel string
+	NextLabel     string
 }
 
 type MediaThumbnailData struct {
@@ -26,6 +28,7 @@ type MediaThumbnailData struct {
 }
 
 type AccountActionsData struct {
-	Email string
-	Token string
+	Email        string
+	Token        string
+	SignOutLabel string
 }

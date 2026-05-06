@@ -21,11 +21,21 @@ func toFieldProps(field FieldData) ui.FieldProps {
 	}
 }
 
-func statusOptions() []ui.FieldOption {
+func statusOptions(options []ui.FieldOption) []ui.FieldOption {
+	if len(options) > 0 {
+		return options
+	}
 	return []ui.FieldOption{
 		{Value: "draft", Label: "Draft"},
 		{Value: "published", Label: "Published"},
 		{Value: "scheduled", Label: "Scheduled"},
 		{Value: "trashed", Label: "Trashed"},
 	}
+}
+
+func fallbackLabel(value string, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
 }

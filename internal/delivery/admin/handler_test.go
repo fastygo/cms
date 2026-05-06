@@ -73,9 +73,10 @@ func TestAdminUsesVersionedAssetsWhenManifestExists(t *testing.T) {
 	defer closeFn()
 
 	manifest := map[string]string{
-		"/static/css/app.css":  "/static/css/app.testhash123.css",
-		"/static/js/theme.js":  "/static/js/theme.testhash123.js",
-		"/static/js/ui8kit.js": "/static/js/ui8kit.testhash123.js",
+		"/static/css/app.css":       "/static/css/app.testhash123.css",
+		"/static/js/theme.js":       "/static/js/theme.testhash123.js",
+		"/static/js/ui8kit.js":      "/static/js/ui8kit.testhash123.js",
+		"/static/js/playground.js":  "/static/js/playground.testhash123.js",
 	}
 	writeManifest(t, manifest)
 

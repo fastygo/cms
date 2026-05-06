@@ -6,17 +6,21 @@ import (
 )
 
 type StatCard struct {
-	Label string
-	Value string
-	Href  string
+	Label       string
+	Value       string
+	Href        string
+	ActionLabel string
 }
 
 type LoginPanelData struct {
-	Title       string
-	Subtitle    string
-	Error       string
-	ReturnTo    string
-	ActionToken string
+	Title         string
+	Subtitle      string
+	Error         string
+	ReturnTo      string
+	ActionToken   string
+	EmailLabel    string
+	PasswordLabel string
+	SubmitLabel   string
 }
 
 type ContentRow struct {
@@ -34,6 +38,16 @@ type ContentTableData struct {
 	Rows        []ContentRow
 	Actions     []elements.Action
 	Pagination  elements.PaginationData
+	Headers     ContentTableHeaders
+	EditLabel   string
+}
+
+type ContentTableHeaders struct {
+	Title   string
+	Slug    string
+	Status  string
+	Author  string
+	Actions string
 }
 
 type PanelData struct {
@@ -56,14 +70,18 @@ type FieldData struct {
 }
 
 type ContentEditorData struct {
-	Title       string
-	Description string
-	Action      string
-	Token       string
-	Fields      []FieldData
-	Status      string
-	Actions     []elements.Action
-	Errors      []elements.FieldError
+	Title         string
+	Description   string
+	Action        string
+	Token         string
+	Fields        []FieldData
+	Status        string
+	Actions       []elements.Action
+	Errors        []elements.FieldError
+	PublishTitle  string
+	StatusLabel   string
+	SaveLabel     string
+	StatusOptions []ui.FieldOption
 }
 
 type SimpleListRow struct {
@@ -82,4 +100,14 @@ type SimpleListData struct {
 	FormAction  string
 	Token       string
 	Fields      []FieldData
+	Headers     SimpleListHeaders
+	OpenLabel   string
+	SaveLabel   string
+}
+
+type SimpleListHeaders struct {
+	Name        string
+	Description string
+	Status      string
+	Actions     string
 }

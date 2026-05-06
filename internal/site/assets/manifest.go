@@ -9,16 +9,18 @@ import (
 const manifestRelativePath = "web/static/asset-manifest.json"
 
 type Paths struct {
-	CSS     string
-	ThemeJS string
-	AppJS   string
+	CSS          string
+	ThemeJS      string
+	AppJS        string
+	PlaygroundJS string
 }
 
 func Resolve() Paths {
 	return Paths{
-		CSS:     ResolvePath("/static/css/app.css"),
-		ThemeJS: ResolvePath("/static/js/theme.js"),
-		AppJS:   ResolvePath("/static/js/ui8kit.js"),
+		CSS:          ResolvePath("/static/css/app.css"),
+		ThemeJS:      ResolvePath("/static/js/theme.js"),
+		AppJS:        ResolvePath("/static/js/ui8kit.js"),
+		PlaygroundJS: ResolvePath("/static/js/playground.js"),
 	}
 }
 

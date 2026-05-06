@@ -2,6 +2,7 @@ package elements
 
 import (
 	templpkg "github.com/a-h/templ"
+	"strings"
 	"github.com/fastygo/ui8kit/ui"
 	"github.com/fastygo/ui8kit/utils"
 )
@@ -56,9 +57,9 @@ templ PaginationControl(data PaginationData) {
 			Class: "ui-group gocms-admin-actions",
 			Attrs: templpkg.Attributes{"data-gocms-element": "pagination"},
 		}) {
-			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page-1), Variant: "outline", Disabled: data.Page <= 1}, "Previous")
+			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page-1), Variant: "outline", Disabled: data.Page <= 1}, paginationPreviousLabel(data.PreviousLabel))
 			@ui.Text(ui.TextProps{FontSize: "sm"}, pageLabel(data.Page, data.TotalPages))
-			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page+1), Variant: "outline", Disabled: data.Page >= data.TotalPages}, "Next")
+			@ui.Button(ui.ButtonProps{Href: pageHref(data.BaseHref, data.Page+1), Variant: "outline", Disabled: data.Page >= data.TotalPages}, paginationNextLabel(data.NextLabel))
 		}
 	}
 }
@@ -83,7 +84,14 @@ templ AccountActions(data AccountActionsData) {
 		@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Email)
 		@ui.Form(ui.FormProps{Action: "/go-logout", Method: "post"}) {
 			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
-			@ui.Button(ui.ButtonProps{Type: "submit", Variant: "outline"}, "Sign out")
+			@ui.Button(ui.ButtonProps{Type: "submit", Variant: "outline"}, accountSignOutLabel(data.SignOutLabel))
 		}
 	}
+}
+
+func accountSignOutLabel(value string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return "Sign out"
 }

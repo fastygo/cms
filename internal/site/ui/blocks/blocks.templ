@@ -20,7 +20,7 @@ templ AdminDashboardCards(cards []StatCard) {
 				@components.CardContent(components.CardContentProps{}) {
 					@ui.Title(ui.TitleProps{Order: 3, FontSize: "3xl"}, card.Value)
 					if card.Href != "" {
-						@ui.Button(ui.ButtonProps{Href: card.Href, Variant: "link"}, "Open")
+						@ui.Button(ui.ButtonProps{Href: card.Href, Variant: "link"}, fallbackLabel(card.ActionLabel, "Open"))
 					}
 				}
 			}
@@ -41,9 +41,9 @@ templ LoginPanel(data LoginPanelData) {
 			@ui.Form(ui.FormProps{Action: "/go-login", Method: "post", Attrs: templpkg.Attributes{"data-gocms-action": "login"}}) {
 				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.ActionToken})
 				@ui.Field(ui.FieldProps{Type: "hidden", Name: "return_to", Value: data.ReturnTo})
-				@ui.Field(ui.FieldProps{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true, Autocomplete: "username"})
-				@ui.Field(ui.FieldProps{ID: "password", Name: "password", Label: "Password", Type: "password", Required: true, Autocomplete: "current-password"})
-				@ui.Button(ui.ButtonProps{Type: "submit"}, "Sign in")
+				@ui.Field(ui.FieldProps{ID: "email", Name: "email", Label: fallbackLabel(data.EmailLabel, "Email"), Type: "email", Required: true, Autocomplete: "username"})
+				@ui.Field(ui.FieldProps{ID: "password", Name: "password", Label: fallbackLabel(data.PasswordLabel, "Password"), Type: "password", Required: true, Autocomplete: "current-password"})
+				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SubmitLabel, "Sign in"))
 			}
 		}
 	}
@@ -76,11 +76,11 @@ templ ContentTable(data ContentTableData) {
 		@ui.Table(ui.TableProps{Attrs: templpkg.Attributes{"data-gocms-resource": "content"}}) {
 			@ui.TableHead(ui.TableSectionProps{}) {
 				@ui.TableRow(ui.TableRowProps{}) {
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Title }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Slug }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Status }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Author }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Actions }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Title, "Title") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Slug, "Slug") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Author, "Author") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
 				}
 			}
 			@ui.TableBody(ui.TableSectionProps{}) {
@@ -93,7 +93,7 @@ templ ContentTable(data ContentTableData) {
 						}
 						@ui.TableCell(ui.TableCellProps{}) { { row.Author } }
 						@ui.TableCell(ui.TableCellProps{}) {
-							@ui.Button(ui.ButtonProps{Href: row.EditURL, Variant: "outline"}, "Edit")
+							@ui.Button(ui.ButtonProps{Href: row.EditURL, Variant: "outline"}, fallbackLabel(data.EditLabel, "Edit"))
 						}
 					}
 				}
@@ -126,21 +126,21 @@ templ ContentEditor(data ContentEditorData) {
 			@ui.Stack(ui.StackProps{Class: "gocms-editor-side"}) {
 				@components.Card(components.CardProps{}) {
 					@components.CardHeader(components.CardHeaderProps{}) {
-						@components.CardTitle(components.CardTitleProps{Order: 3}, "Publish")
+						@components.CardTitle(components.CardTitleProps{Order: 3}, fallbackLabel(data.PublishTitle, "Publish"))
 					}
 					@components.CardContent(components.CardContentProps{}) {
 						@ui.Field(ui.FieldProps{
 							ID: "status",
 							Name: "status",
-							Label: "Status",
+							Label: fallbackLabel(data.StatusLabel, "Status"),
 							Component: "select",
 							Value: data.Status,
-							Options: statusOptions(),
+							Options: statusOptions(data.StatusOptions),
 						})
 					}
 					@components.CardFooter(components.CardFooterProps{}) {
 						@ui.Group(ui.GroupProps{Class: "gocms-admin-actions"}) {
-							@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+							@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SaveLabel, "Save"))
 							for _, action := range data.Actions {
 								if action.Method == "" || action.Method == "GET" {
 									@ui.Button(ui.ButtonProps{Href: action.Href, Variant: "outline", Disabled: !action.Enabled}, action.Label)
@@ -166,8 +166,9 @@ templ SettingsCard(data ContentEditorData) {
 			for _, field := range data.Fields {
 				@ui.Field(toFieldProps(field))
 			}
-			@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+			@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SaveLabel, "Save"))
 		}
+		@elements.ActionRow(data.Actions)
 	}
 }
 
@@ -189,16 +190,16 @@ templ SimpleList(data SimpleListData) {
 				for _, field := range data.Fields {
 					@ui.Field(toFieldProps(field))
 				}
-				@ui.Button(ui.ButtonProps{Type: "submit"}, "Save")
+				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SaveLabel, "Save"))
 			}
 		}
 		@ui.Table(ui.TableProps{}) {
 			@ui.TableHead(ui.TableSectionProps{}) {
 				@ui.TableRow(ui.TableRowProps{}) {
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Name }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Description }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Status }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Actions }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Name, "Name") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Description, "Description") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
 				}
 			}
 			@ui.TableBody(ui.TableSectionProps{}) {
@@ -211,7 +212,7 @@ templ SimpleList(data SimpleListData) {
 						}
 						@ui.TableCell(ui.TableCellProps{}) {
 							if row.ActionURL != "" {
-								@ui.Button(ui.ButtonProps{Href: row.ActionURL, Variant: "outline"}, "Open")
+								@ui.Button(ui.ButtonProps{Href: row.ActionURL, Variant: "outline"}, fallbackLabel(data.OpenLabel, "Open"))
 							}
 						}
 					}

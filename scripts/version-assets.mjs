@@ -6,6 +6,7 @@ const root = process.cwd();
 const staticRoot = join(root, "web", "static");
 const manifestPath = join(staticRoot, "asset-manifest.json");
 const cssAssets = ["web/static/css/app.css"];
+const jsAssets = ["web/static/js/playground.js"];
 const ui8kitManifestPath = join(staticRoot, "js", "manifest.json");
 
 function versionedName(filePath, hash) {
@@ -47,6 +48,17 @@ for (const relativePath of cssAssets) {
   await cleanOldVersionedFiles(source);
   await copyFile(source, target);
   manifest[staticPath(source)] = staticPath(target);
+}
+
+for (const relativePath of jsAssets) {
+	const source = join(root, relativePath);
+	const contents = await readFile(source);
+	const hash = createHash("sha256").update(contents).digest("hex").slice(0, 12);
+	const target = join(dirname(source), versionedName(source, hash));
+
+	await cleanOldVersionedFiles(source);
+	await copyFile(source, target);
+	manifest[staticPath(source)] = staticPath(target);
 }
 
 await cleanOldVersionedFiles(join(staticRoot, "js", "theme.js"));

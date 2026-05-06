@@ -14,6 +14,7 @@ import (
 	appusers "github.com/fastygo/cms/internal/application/users"
 	"github.com/fastygo/cms/internal/delivery/admin"
 	"github.com/fastygo/cms/internal/delivery/rest"
+	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 	"github.com/fastygo/cms/internal/runtime/fixtures"
 	sqlitestore "github.com/fastygo/cms/internal/storage/sqlite"
 	"github.com/fastygo/framework/pkg/app"
@@ -27,7 +28,29 @@ type Module struct {
 	seedFixtures bool
 }
 
+type Options struct {
+	DataSource     string
+	SessionKey     string
+	SeedFixtures   bool
+	RuntimeProfile string
+	StorageProfile string
+}
+
 func New(dataSource string, sessionKey string, seedFixtures bool) (*Module, error) {
+	return NewWithOptions(Options{
+		DataSource:   dataSource,
+		SessionKey:   sessionKey,
+		SeedFixtures: seedFixtures,
+	})
+}
+
+func NewWithOptions(options Options) (*Module, error) {
+	dataSource := options.DataSource
+	seedFixtures := options.SeedFixtures
+	if isBrowserLocalProfile(options) {
+		dataSource = "file:gocms-playground?mode=memory&cache=shared"
+		seedFixtures = false
+	}
 	store, err := sqlitestore.Open(dataSource)
 	if err != nil {
 		return nil, err
@@ -46,7 +69,7 @@ func New(dataSource string, sessionKey string, seedFixtures bool) (*Module, erro
 		Settings:     appsettings.NewService(store),
 		Menus:        appmenus.NewService(store),
 	}
-	authenticator := rest.NewAuthenticator(sessionKey, rest.DevBearerPrincipals())
+	authenticator := rest.NewAuthenticator(options.SessionKey, rest.DevBearerPrincipals())
 	module.handler = rest.NewHandler(services, authenticator)
 	module.adminHandler = admin.NewHandler(admin.Services{
 		Content:      services.Content,
@@ -56,12 +79,17 @@ func New(dataSource string, sessionKey string, seedFixtures bool) (*Module, erro
 		Users:        services.Users,
 		Settings:     services.Settings,
 		Menus:        services.Menus,
-	}, authenticator, sessionKey)
+	}, authenticator, options.SessionKey)
 	if err := module.Init(context.Background()); err != nil {
 		_ = store.Close(context.Background())
 		return nil, err
 	}
 	return module, nil
+}
+
+func isBrowserLocalProfile(options Options) bool {
+	return options.RuntimeProfile == string(runtimeprofile.RuntimeProfilePlayground) ||
+		options.StorageProfile == string(runtimeprofile.StorageProfileBrowserIndexedDB)
 }
 
 func (m *Module) ID() string {

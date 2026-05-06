@@ -1,0 +1,262 @@
+{
+  "admin": {
+    "meta": {
+      "lang": "en",
+      "title": "GoCMS Admin",
+      "brand_name": "GoCMS"
+    },
+    "theme": {
+      "label": "Theme",
+      "switch_to_dark_label": "Switch to dark mode",
+      "switch_to_light_label": "Switch to light mode"
+    },
+    "language": {
+      "label": "Language",
+      "current_label": "EN",
+      "next_label": "RU",
+      "next_locale": "ru",
+      "available": ["en", "ru"],
+      "locale_labels": {
+        "en": "EN",
+        "ru": "RU"
+      }
+    },
+    "login": {
+      "title": "GoCMS Login",
+      "subtitle": "Use fixture credentials: admin@example.test / admin.",
+      "error_invalid_credentials": "Invalid credentials."
+    },
+    "navigation": [
+      {"label": "Dashboard", "path": "/go-admin", "icon": "home", "order": 0},
+      {"label": "Posts", "path": "/go-admin/posts", "icon": "file", "order": 1},
+      {"label": "Pages", "path": "/go-admin/pages", "icon": "book", "order": 2},
+      {"label": "Content types", "path": "/go-admin/content-types", "icon": "box", "order": 3},
+      {"label": "Taxonomies", "path": "/go-admin/taxonomies", "icon": "boxes", "order": 4},
+      {"label": "Media", "path": "/go-admin/media", "icon": "image", "order": 5},
+      {"label": "Menus", "path": "/go-admin/menus", "icon": "menu", "order": 6},
+      {"label": "Users", "path": "/go-admin/users", "icon": "users", "order": 7},
+      {"label": "Authors", "path": "/go-admin/authors", "icon": "users", "order": 8},
+      {"label": "Capabilities", "path": "/go-admin/capabilities", "icon": "shield", "order": 9},
+      {"label": "Settings", "path": "/go-admin/settings", "icon": "sliders", "order": 10},
+      {"label": "Headless", "path": "/go-admin/headless", "icon": "server", "order": 11}
+    ],
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Manage GoCMS content, taxonomies, media, users, and headless delivery.",
+      "cards": [
+        {"label": "Posts"},
+        {"label": "Pages"},
+        {"label": "Taxonomies"},
+        {"label": "Media"}
+      ]
+    },
+    "screens": {
+      "dashboard": {
+        "title": "Dashboard",
+        "description": "Manage GoCMS content, taxonomies, media, users, and headless delivery.",
+        "singular": "",
+        "form_description": ""
+      },
+      "posts": {
+        "title": "Posts",
+        "description": "Create, edit, publish, schedule, trash, and restore content.",
+        "singular": "Post",
+        "form_description": "Create a draft and choose publish state."
+      },
+      "pages": {
+        "title": "Pages",
+        "description": "Create, edit, publish, schedule, trash, and restore content.",
+        "singular": "Page",
+        "form_description": "Create a draft and choose publish state."
+      },
+      "content-types": {
+        "title": "Content types",
+        "description": "Manage built-in and custom content types.",
+        "singular": "Content type",
+        "form_description": "Update content type configuration."
+      },
+      "taxonomies": {
+        "title": "Taxonomies",
+        "description": "Manage taxonomy definitions and terms.",
+        "singular": "Taxonomy",
+        "form_description": "Configure taxonomy metadata."
+      },
+      "terms": {
+        "title": "Terms",
+        "description": "Manage taxonomy terms.",
+        "singular": "Term",
+        "form_description": "Create taxonomy terms."
+      },
+      "media": {
+        "title": "Media",
+        "description": "Manage media metadata and featured media references.",
+        "singular": "Media",
+        "form_description": "Attach media metadata to your site."
+      },
+      "menus": {
+        "title": "Menus",
+        "description": "Manage navigation menus.",
+        "singular": "Menu",
+        "form_description": "Create or edit a menu entry."
+      },
+      "users": {
+        "title": "Users",
+        "description": "Manage users and account state.",
+        "singular": "User",
+        "form_description": "Manage user metadata."
+      },
+      "authors": {
+        "title": "Authors",
+        "description": "Review public author projections.",
+        "singular": "Author",
+        "form_description": "Inspect author details."
+      },
+      "capabilities": {
+        "title": "Roles and capabilities",
+        "description": "Review capability groups enforced server-side.",
+        "singular": "Capability",
+        "form_description": "Review user permission groups."
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Configure public site settings.",
+        "singular": "Setting",
+        "form_description": "Update site-level configuration."
+      },
+      "headless": {
+        "title": "API and headless settings",
+        "description": "Inspect API delivery mode and upcoming plugin state.",
+        "singular": "Headless setting",
+        "form_description": "Review API surface configuration."
+      }
+    },
+    "forms": {
+      "content-editor": {
+        "fields": [
+          {"id": "title", "name": "title", "label": "Title", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "slug", "name": "slug", "label": "Slug", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "content", "name": "content", "label": "Content", "value": "", "type": "text", "component": "textarea", "placeholder": "", "required": false, "rows": 8},
+          {"id": "excerpt", "name": "excerpt", "label": "Excerpt", "value": "", "type": "text", "component": "textarea", "placeholder": "", "required": false, "rows": 3},
+          {"id": "author_id", "name": "author_id", "label": "Author ID", "value": "author-1", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "featured_media_id", "name": "featured_media_id", "label": "Featured media ID", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0},
+          {"id": "template", "name": "template", "label": "Template", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0},
+          {"id": "terms", "name": "terms", "label": "Taxonomy terms", "value": "", "type": "text", "component": "", "placeholder": "category:news,tag:go", "required": false, "rows": 0},
+          {"id": "meta_key", "name": "meta_key", "label": "Metadata key", "value": "", "type": "text", "component": "", "placeholder": "seo_title", "required": false, "rows": 0},
+          {"id": "meta_value", "name": "meta_value", "label": "Metadata value", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0}
+        ]
+      },
+      "content-types": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "Content type ID", "value": "", "type": "text", "component": "", "placeholder": "product", "required": true, "rows": 0},
+          {"id": "label", "name": "label", "label": "Label", "value": "", "type": "text", "component": "", "placeholder": "Products", "required": true, "rows": 0}
+        ]
+      },
+      "taxonomies": {
+        "fields": [
+          {"id": "type", "name": "type", "label": "Taxonomy type", "value": "", "type": "text", "component": "", "placeholder": "brand", "required": true, "rows": 0},
+          {"id": "label", "name": "label", "label": "Label", "value": "", "type": "text", "component": "", "placeholder": "Brands", "required": true, "rows": 0},
+          {"id": "mode", "name": "mode", "label": "Mode", "value": "flat", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0}
+        ]
+      },
+      "terms": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "Term ID", "value": "", "type": "text", "component": "", "placeholder": "term-1", "required": true, "rows": 0},
+          {"id": "name", "name": "name", "label": "Name", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "slug", "name": "slug", "label": "Slug", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "media": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "Media ID", "value": "", "type": "text", "component": "", "placeholder": "media-1", "required": true, "rows": 0},
+          {"id": "filename", "name": "filename", "label": "Filename", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "mime_type", "name": "mime_type", "label": "MIME type", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "public_url", "name": "public_url", "label": "Public URL", "value": "", "type": "url", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "menus": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "Menu ID", "value": "", "type": "text", "component": "", "placeholder": "primary", "required": true, "rows": 0},
+          {"id": "name", "name": "name", "label": "Name", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "location", "name": "location", "label": "Location", "value": "primary", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "users": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "User ID", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "login", "name": "login", "label": "Login", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "display_name", "name": "display_name", "label": "Display name", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "email", "name": "email", "label": "Email", "value": "", "type": "email", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "settings": {
+        "fields": [
+          {"id": "site_title", "name": "site_title", "label": "Site title", "value": "GoCMS", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "public_rendering", "name": "public_rendering", "label": "Public rendering", "value": "disabled", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "playground": {
+        "fields": []
+      }
+    },
+    "labels": {
+      "action_create": "Create",
+      "action_edit": "Edit",
+      "action_save": "Save",
+      "action_back": "Back",
+      "action_sign_out": "Sign out",
+      "action_sign_in": "Sign in",
+      "action_open": "Open",
+      "action_previous": "Previous",
+      "action_next": "Next",
+      "field_email": "Email",
+      "field_password": "Password",
+      "field_site_title": "Site title",
+      "field_public_rendering": "Public rendering",
+      "field_status": "Status",
+      "panel_publish": "Publish",
+      "table_title": "Title",
+      "table_slug": "Slug",
+      "table_status": "Status",
+      "table_author": "Author",
+      "table_actions": "Actions",
+      "table_name": "Name",
+      "table_description": "Description",
+      "status_draft": "Draft",
+      "status_published": "Published",
+      "status_scheduled": "Scheduled",
+      "status_trashed": "Trashed",
+      "action_content_create": "Create a draft and choose publish state.",
+      "action_content_update": "Update content fields and publication state.",
+      "action_import_source": "Import from compatibility REST source",
+      "action_import_json": "Import JSON from device",
+      "action_export_json": "Export JSON to device",
+      "action_reset": "Reset local playground storage",
+      "headless_rest": "REST endpoint",
+      "headless_graphql": "GraphQL endpoint",
+      "headless_rendering": "Public rendering",
+      "headless_rest_description": "/go-json/go/v2/ is enabled",
+      "headless_graphql_description": "Planned as Pass 4 plugin",
+      "headless_rendering_description": "Can remain disabled for headless mode",
+      "capability_content": "Content",
+      "capability_content_description": "Create, edit, publish, schedule, trash, restore",
+      "capability_taxonomies": "Taxonomies",
+      "capability_taxonomies_description": "Manage and assign terms",
+      "capability_settings": "Settings",
+      "capability_settings_description": "Manage private and public settings",
+      "capability_users": "Users",
+      "capability_users_description": "Manage accounts and roles",
+      "action_form_placeholder": "Save",
+      "action_refresh": "Refresh from source",
+      "validation_credentials_missing": "Email and password are required."
+    },
+    "playground": {
+      "import_label": "Import JSON from device",
+      "export_label": "Export JSON to device",
+      "reset_label": "Reset local playground storage",
+      "import_from_source": "Import from compatibility REST source",
+      "refresh_from_source": "Refresh from source",
+      "import_limit_hint": "The first version imports up to 10 posts.",
+      "missing_blob_label": "Missing media binary, preview unavailable."
+    }
+  }
+}

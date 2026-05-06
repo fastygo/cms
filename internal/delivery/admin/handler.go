@@ -24,6 +24,7 @@ import (
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/assets"
 	"github.com/fastygo/cms/internal/site/ui/blocks"
 	"github.com/fastygo/cms/internal/site/ui/elements"
@@ -31,6 +32,9 @@ import (
 	"github.com/fastygo/framework/pkg/app"
 	frameworkauth "github.com/fastygo/framework/pkg/auth"
 	"github.com/fastygo/framework/pkg/web"
+	"github.com/fastygo/framework/pkg/web/locale"
+	"github.com/fastygo/framework/pkg/web/view"
+	"github.com/fastygo/ui8kit/ui"
 )
 
 type Services struct {
@@ -52,6 +56,12 @@ type Handler struct {
 type actionToken struct {
 	Action string `json:"action"`
 	Exp    int64  `json:"exp"`
+}
+
+type dashboardCardValue struct {
+	Key   string
+	Value string
+	Href  string
 }
 
 func NewHandler(services Services, authenticator rest.Authenticator, secret string) Handler {
@@ -95,28 +105,35 @@ func (h Handler) Register(mux *http.ServeMux) {
 }
 
 func (h Handler) NavItems() []app.NavItem {
-	return []app.NavItem{
-		{Label: "Dashboard", Path: "/go-admin", Icon: "home", Order: 0},
-		{Label: "Posts", Path: "/go-admin/posts", Icon: "file", Order: 1},
-		{Label: "Pages", Path: "/go-admin/pages", Icon: "book", Order: 2},
-		{Label: "Content types", Path: "/go-admin/content-types", Icon: "box", Order: 3},
-		{Label: "Taxonomies", Path: "/go-admin/taxonomies", Icon: "boxes", Order: 4},
-		{Label: "Media", Path: "/go-admin/media", Icon: "image", Order: 5},
-		{Label: "Menus", Path: "/go-admin/menus", Icon: "menu", Order: 6},
-		{Label: "Users", Path: "/go-admin/users", Icon: "users", Order: 7},
-		{Label: "Authors", Path: "/go-admin/authors", Icon: "users", Order: 8},
-		{Label: "Capabilities", Path: "/go-admin/capabilities", Icon: "shield", Order: 9},
-		{Label: "Settings", Path: "/go-admin/settings", Icon: "sliders", Order: 10},
-		{Label: "Headless", Path: "/go-admin/headless", Icon: "server", Order: 11},
+	return h.NavItemsFromBundle(adminfixtures.MustLoad("en"))
+}
+
+func (h Handler) NavItemsFromBundle(bundle adminfixtures.AdminFixture) []app.NavItem {
+	items := make([]app.NavItem, 0, len(bundle.Navigation))
+	for _, item := range bundle.Navigation {
+		items = append(items, app.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon, Order: item.Order})
 	}
+	return items
+}
+
+func (h Handler) fixture(r *http.Request) adminfixtures.AdminFixture {
+	if r == nil {
+		return adminfixtures.MustLoad("en")
+	}
+	return adminfixtures.MustLoad(locale.From(r.Context()))
 }
 
 func (h Handler) loginPage(w http.ResponseWriter, r *http.Request) {
+	fixture := h.fixture(r)
 	data := views.LoginPageData{
-		Title:       "GoCMS Login",
-		Subtitle:    "Use fixture credentials: admin@example.test / admin.",
-		ReturnTo:    returnTo(r),
-		ActionToken: h.token("login"),
+		Title:         fixture.Login.Title,
+		Subtitle:      fixture.Login.Subtitle,
+		Lang:          fixture.Meta.Lang,
+		ReturnTo:      returnTo(r),
+		ActionToken:   h.token("login"),
+		EmailLabel:    fixture.Label("field_email", "Email"),
+		PasswordLabel: fixture.Label("field_password", "Password"),
+		SubmitLabel:   fixture.Label("action_sign_in", "Sign in"),
 	}
 	_ = web.Render(r.Context(), w, views.LoginPage(data))
 }
@@ -130,9 +147,20 @@ func (h Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid action token.", http.StatusForbidden)
 		return
 	}
+	fixture := h.fixture(r)
 	session, ok := fixtureSession(r.PostForm.Get("email"), r.PostForm.Get("password"))
 	if !ok {
-		data := views.LoginPageData{Title: "GoCMS Login", Subtitle: "Use fixture credentials: admin@example.test / admin.", Error: "Invalid credentials.", ReturnTo: returnTo(r), ActionToken: h.token("login")}
+		data := views.LoginPageData{
+			Title:         fixture.Login.Title,
+			Subtitle:      fixture.Login.Subtitle,
+			Error:         fixture.Login.ErrorInvalidCredentials,
+			Lang:          fixture.Meta.Lang,
+			ReturnTo:      returnTo(r),
+			ActionToken:   h.token("login"),
+			EmailLabel:    fixture.Label("field_email", "Email"),
+			PasswordLabel: fixture.Label("field_password", "Password"),
+			SubmitLabel:   fixture.Label("action_sign_in", "Sign in"),
+		}
 		_ = web.Render(r.Context(), w, views.LoginPage(data))
 		return
 	}
@@ -164,18 +192,21 @@ func (h Handler) protect(next func(http.ResponseWriter, *http.Request, authz.Pri
 }
 
 func (h Handler) dashboard(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	postCount := h.contentCount(r.Context(), domaincontent.KindPost)
 	pageCount := h.contentCount(r.Context(), domaincontent.KindPage)
 	taxonomies, _ := h.services.Taxonomy.ListDefinitions(r.Context())
 	media, _ := h.services.Media.List(r.Context())
 	data := views.DashboardData{
-		Layout: h.layout(r, principal, "Dashboard", "/go-admin"),
-		Cards: []blocks.StatCard{
-			{Label: "Posts", Value: strconv.Itoa(postCount), Href: "/go-admin/posts"},
-			{Label: "Pages", Value: strconv.Itoa(pageCount), Href: "/go-admin/pages"},
-			{Label: "Taxonomies", Value: strconv.Itoa(len(taxonomies)), Href: "/go-admin/taxonomies"},
-			{Label: "Media", Value: strconv.Itoa(len(media)), Href: "/go-admin/media"},
-		},
+		Layout:      h.layout(r, principal, fixture.Dashboard.Title, "/go-admin"),
+		Title:       fixture.Dashboard.Title,
+		Description: fixture.Dashboard.Description,
+		Cards: h.dashboardCards(fixture, []dashboardCardValue{
+			{Key: "Posts", Value: strconv.Itoa(postCount), Href: "/go-admin/posts"},
+			{Key: "Pages", Value: strconv.Itoa(pageCount), Href: "/go-admin/pages"},
+			{Key: "Taxonomies", Value: strconv.Itoa(len(taxonomies)), Href: "/go-admin/taxonomies"},
+			{Key: "Media", Value: strconv.Itoa(len(media)), Href: "/go-admin/media"},
+		}),
 	}
 	_ = web.Render(r.Context(), w, views.DashboardPage(data))
 }
@@ -183,6 +214,10 @@ func (h Handler) dashboard(w http.ResponseWriter, r *http.Request, principal aut
 func (h Handler) contentList(kind domaincontent.Kind, screen string) func(http.ResponseWriter, *http.Request, authz.Principal) {
 	return func(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
 		result, _ := h.services.Content.List(r.Context(), domaincontent.Query{Kinds: []domaincontent.Kind{kind}, Page: 1, PerPage: 50, SortBy: domaincontent.SortUpdatedAt, SortDesc: true})
+		fixture := h.fixture(r)
+		screenFixture, _ := fixture.Screen(screen)
+		screenTitle := fallbackValue(screenFixture.Title, titleFor(screen))
+		screenDescription := fallbackValue(screenFixture.Description, "Create, edit, publish, schedule, trash, and restore content.")
 		rows := make([]blocks.ContentRow, 0, len(result.Items))
 		for _, entry := range result.Items {
 			rows = append(rows, blocks.ContentRow{
@@ -195,14 +230,20 @@ func (h Handler) contentList(kind domaincontent.Kind, screen string) func(http.R
 			})
 		}
 		data := views.ContentListPageData{
-			Layout: h.layout(r, principal, titleFor(screen), "/go-admin/"+screen),
+			Layout: h.layout(r, principal, screenTitle, "/go-admin/"+screen),
 			Screen: screen,
 			Table: blocks.ContentTableData{
-				Title:       titleFor(screen),
-				Description: "Create, edit, publish, schedule, trash, and restore content.",
+				Title:       screenTitle,
+				Description: screenDescription,
 				Rows:        rows,
-				Actions:     []elements.Action{{Label: "Create", Href: "/go-admin/" + screen + "/new", Enabled: principal.Has(authz.CapabilityContentCreate)}},
-				Pagination:  elements.PaginationData{Page: 1, TotalPages: 1, BaseHref: "/go-admin/" + screen},
+				Actions:     []elements.Action{{Label: h.labelFromFixture(fixture, "action_create", "Create"), Href: "/go-admin/" + screen + "/new", Enabled: principal.Has(authz.CapabilityContentCreate)}},
+				Pagination: elements.PaginationData{
+					Page: 1, TotalPages: 1, BaseHref: "/go-admin/" + screen,
+					PreviousLabel: fixture.Label("action_previous", "Previous"),
+					NextLabel:     fixture.Label("action_next", "Next"),
+				},
+				Headers:   h.contentTableHeaders(fixture),
+				EditLabel: fixture.Label("action_edit", "Edit"),
 			},
 		}
 		_ = web.Render(r.Context(), w, views.ContentListPage(data))
@@ -215,10 +256,14 @@ func (h Handler) contentNew(kind domaincontent.Kind, screen string) func(http.Re
 			http.Error(w, "Forbidden.", http.StatusForbidden)
 			return
 		}
+		fixture := h.fixture(r)
+		screenFixture, _ := fixture.Screen(screen)
+		singularName := fallbackValue(screenFixture.Singular, singular(screen))
+		description := fallbackValue(screenFixture.FormDescription, h.labelFromFixture(fixture, "action_content_create", "Create a draft and choose publish state."))
 		data := views.ContentEditPageData{
-			Layout: h.layout(r, principal, "New "+singular(screen), "/go-admin/"+screen),
+			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_new", "New")+" "+singularName, "/go-admin/"+screen),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor("New "+singular(screen), "Create a draft and choose publish state.", "/go-admin/"+screen, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
+			Editor: h.contentEditor(fixture, "New "+singularName, description, "/go-admin/"+screen, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -231,10 +276,13 @@ func (h Handler) contentEdit(screen string) func(http.ResponseWriter, *http.Requ
 			http.NotFound(w, r)
 			return
 		}
+		fixture := h.fixture(r)
+		screenFixture, _ := fixture.Screen(screen)
+		description := fallbackValue(screenFixture.FormDescription, h.labelFromFixture(fixture, "action_content_update", "Update content fields and publication state."))
 		data := views.ContentEditPageData{
-			Layout: h.layout(r, principal, "Edit "+entry.Title.Value("en", "en"), "/go-admin/"+screen),
+			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), "/go-admin/"+screen),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor("Edit "+entry.Title.Value("en", "en"), "Update content fields and publication state.", "/go-admin/"+screen+"/"+string(entry.ID), h.token("content-write"), entry),
+			Editor: h.contentEditor(fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, "/go-admin/"+screen+"/"+string(entry.ID), h.token("content-write"), entry),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -308,12 +356,13 @@ func (h Handler) contentTrash(w http.ResponseWriter, r *http.Request, principal 
 }
 
 func (h Handler) contentTypesPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.ContentTypes.List(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.ID), Description: item.Label, Status: visibleStatus(item.RESTVisible), ActionURL: ""})
 	}
-	h.renderSimple(w, r, principal, "content-types", "Content types", "Manage built-in and custom content types.", rows, "content-types", simpleFields("content-types"), "/go-admin/content-types")
+	h.renderSimple(w, r, principal, "content-types", fixture, rows, "content-types", h.simpleFields(r, "content-types"), "/go-admin/content-types")
 }
 
 func (h Handler) contentTypeCreate(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -335,12 +384,13 @@ func (h Handler) contentTypeCreate(w http.ResponseWriter, r *http.Request, princ
 }
 
 func (h Handler) taxonomiesPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.Taxonomy.ListDefinitions(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.Type), Description: item.Label, Status: string(item.Mode), ActionURL: "/go-admin/taxonomies/" + string(item.Type) + "/terms"})
 	}
-	h.renderSimple(w, r, principal, "taxonomies", "Taxonomies", "Manage taxonomy definitions and terms.", rows, "taxonomies", simpleFields("taxonomies"), "/go-admin/taxonomies")
+	h.renderSimple(w, r, principal, "taxonomies", fixture, rows, "taxonomies", h.simpleFields(r, "taxonomies"), "/go-admin/taxonomies")
 }
 
 func (h Handler) taxonomyCreate(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -362,13 +412,14 @@ func (h Handler) taxonomyCreate(w http.ResponseWriter, r *http.Request, principa
 }
 
 func (h Handler) termsPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	taxonomyType := domaintaxonomy.Type(r.PathValue("type"))
 	items, _ := h.services.Taxonomy.ListTerms(r.Context(), taxonomyType)
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.ID), Description: item.Name.Value("en", "en"), Status: string(item.Type)})
 	}
-	h.renderSimple(w, r, principal, "terms", "Terms", "Manage taxonomy terms.", rows, "terms", simpleFields("terms"), "/go-admin/taxonomies/"+string(taxonomyType)+"/terms")
+	h.renderSimple(w, r, principal, "terms", fixture, rows, "terms", h.simpleFields(r, "terms"), "/go-admin/taxonomies/"+string(taxonomyType)+"/terms")
 }
 
 func (h Handler) termCreate(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -390,12 +441,13 @@ func (h Handler) termCreate(w http.ResponseWriter, r *http.Request, principal au
 }
 
 func (h Handler) mediaPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.Media.List(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.ID), Description: item.Filename, Status: item.MimeType})
 	}
-	h.renderSimple(w, r, principal, "media", "Media", "Manage media metadata and featured media references.", rows, "media", simpleFields("media"), "/go-admin/media")
+	h.renderSimple(w, r, principal, "media", fixture, rows, "media", h.simpleFields(r, "media"), "/go-admin/media")
 }
 
 func (h Handler) mediaSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -417,12 +469,13 @@ func (h Handler) mediaSave(w http.ResponseWriter, r *http.Request, principal aut
 }
 
 func (h Handler) menusPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.Menus.List(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.ID), Description: item.Name, Status: string(item.Location)})
 	}
-	h.renderSimple(w, r, principal, "menus", "Menus", "Manage navigation menus.", rows, "menus", simpleFields("menus"), "/go-admin/menus")
+	h.renderSimple(w, r, principal, "menus", fixture, rows, "menus", h.simpleFields(r, "menus"), "/go-admin/menus")
 }
 
 func (h Handler) menuSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -444,12 +497,13 @@ func (h Handler) menuSave(w http.ResponseWriter, r *http.Request, principal auth
 }
 
 func (h Handler) usersPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.Users.List(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, blocks.SimpleListRow{Label: string(item.ID), Description: item.DisplayName, Status: string(item.Status)})
 	}
-	h.renderSimple(w, r, principal, "users", "Users", "Manage users and account state.", rows, "users", simpleFields("users"), "/go-admin/users")
+	h.renderSimple(w, r, principal, "users", fixture, rows, "users", h.simpleFields(r, "users"), "/go-admin/users")
 }
 
 func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -471,31 +525,46 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 }
 
 func (h Handler) authorsPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	items, _ := h.services.Users.List(r.Context())
 	rows := make([]blocks.SimpleListRow, 0, len(items))
 	for _, item := range items {
 		author := item.PublicAuthor()
 		rows = append(rows, blocks.SimpleListRow{Label: string(author.ID), Description: author.DisplayName, Status: author.Slug})
 	}
-	h.renderSimple(w, r, principal, "authors", "Authors", "Review public author projections.", rows, "authors", nil, "")
+	h.renderSimple(w, r, principal, "authors", fixture, rows, "authors", nil, "")
 }
 
 func (h Handler) capabilitiesPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	rows := []blocks.SimpleListRow{
-		{Label: "Content", Description: "Create, edit, publish, schedule, trash, restore", Status: "core"},
-		{Label: "Taxonomies", Description: "Manage and assign terms", Status: "core"},
-		{Label: "Settings", Description: "Manage private and public settings", Status: "restricted"},
-		{Label: "Users", Description: "Manage accounts and roles", Status: "restricted"},
+		{Label: fixture.Label("capability_content", "Content"), Description: fixture.Label("capability_content_description", "Create, edit, publish, schedule, trash, restore"), Status: "core"},
+		{Label: fixture.Label("capability_taxonomies", "Taxonomies"), Description: fixture.Label("capability_taxonomies_description", "Manage and assign terms"), Status: "core"},
+		{Label: fixture.Label("capability_settings", "Settings"), Description: fixture.Label("capability_settings_description", "Manage private and public settings"), Status: "restricted"},
+		{Label: fixture.Label("capability_users", "Users"), Description: fixture.Label("capability_users_description", "Manage accounts and roles"), Status: "restricted"},
 	}
-	h.renderSimple(w, r, principal, "capabilities", "Roles and capabilities", "Review capability groups enforced server-side.", rows, "capabilities", nil, "")
+	h.renderSimple(w, r, principal, "capabilities", fixture, rows, "capabilities", nil, "")
 }
 
 func (h Handler) settingsPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
-	form := blocks.ContentEditorData{
-		Title: "Settings", Description: "Configure public site settings.", Action: "/go-admin/settings", Token: h.token("settings-write"),
-		Fields: []blocks.FieldData{{ID: "site_title", Name: "site_title", Label: "Site title", Value: "GoCMS", Required: true}, {ID: "public_rendering", Name: "public_rendering", Label: "Public rendering", Value: "disabled"}},
-	}
-	_ = web.Render(r.Context(), w, views.SettingsPage(views.SettingsPageData{Layout: h.layout(r, principal, "Settings", "/go-admin/settings"), Screen: "settings", Form: form}))
+	fixture := h.fixture(r)
+	form := h.contentEditorFromFixture(fixture, "settings", "/go-admin/settings", h.token("settings-write"), []blocks.FieldData{
+		{ID: "site_title", Name: "site_title", Label: fixture.Label("field_site_title", "Site title"), Value: "GoCMS", Required: true},
+		{ID: "public_rendering", Name: "public_rendering", Label: fixture.Label("field_public_rendering", "Public rendering"), Value: "disabled"},
+	})
+	screen, _ := fixture.Screen("settings")
+	title := fallbackValue(screen.Title, "Settings")
+	description := fallbackValue(screen.Description, "Configure public site settings.")
+	form.Actions = h.playgroundActions(fixture, "/go-admin/settings")
+	form.Title = title
+	form.Description = description
+	_ = web.Render(r.Context(), w, views.SettingsPage(views.SettingsPageData{
+		Layout:      h.layout(r, principal, title, "/go-admin/settings"),
+		Screen:      "settings",
+		Form:        form,
+		Title:       title,
+		Description: description,
+	}))
 }
 
 func (h Handler) settingsSave(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -516,21 +585,46 @@ func (h Handler) settingsSave(w http.ResponseWriter, r *http.Request, principal 
 }
 
 func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
 	rows := []blocks.SimpleListRow{
-		{Label: "REST", Description: "/go-json/go/v2/ is enabled", Status: "enabled"},
-		{Label: "GraphQL", Description: "Planned as Pass 4 plugin", Status: "planned"},
-		{Label: "Public rendering", Description: "Can remain disabled for headless mode", Status: "disabled"},
+		{Label: fixture.Label("headless_rest", "REST"), Description: fixture.Label("headless_rest_description", "/go-json/go/v2/ is enabled"), Status: "enabled"},
+		{Label: fixture.Label("headless_graphql", "GraphQL"), Description: fixture.Label("headless_graphql_description", "Planned as Pass 4 plugin"), Status: "planned"},
+		{Label: fixture.Label("headless_rendering", "Public rendering"), Description: fixture.Label("headless_rendering_description", "Can remain disabled for headless mode"), Status: "disabled"},
 	}
-	h.renderSimple(w, r, principal, "headless", "API and headless settings", "Inspect API delivery mode and upcoming plugin state.", rows, "headless-settings", nil, "")
+	h.renderSimple(w, r, principal, "headless", fixture, rows, "headless-settings", nil, "")
 }
 
-func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal authz.Principal, screen string, title string, description string, rows []blocks.SimpleListRow, marker string, fields []blocks.FieldData, formAction string) {
+func (h Handler) playgroundActions(fixture adminfixtures.AdminFixture, basePath string) []elements.Action {
+	return []elements.Action{
+		{Label: fixture.Label("action_import_source", "Import from compatibility REST source"), Href: basePath + "?playground=import-source", Style: "outline", Enabled: true},
+		{Label: fixture.Label("action_import_json", "Import JSON from device"), Href: basePath + "?playground=import-json", Style: "outline", Enabled: true},
+		{Label: fixture.Label("action_export_json", "Export JSON to device"), Href: basePath + "?playground=export-json", Style: "outline", Enabled: true},
+		{Label: fixture.Label("action_refresh", "Refresh from source"), Href: basePath + "?playground=refresh-source", Style: "outline", Enabled: true},
+		{Label: fixture.Label("action_reset", "Reset local playground storage"), Href: basePath + "?playground=reset-storage", Style: "outline", Enabled: true},
+	}
+}
+
+func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal authz.Principal, screen string, bundle adminfixtures.AdminFixture, rows []blocks.SimpleListRow, marker string, fields []blocks.FieldData, formAction string) {
+	screenData, _ := bundle.Screen(screen)
+	title := fallbackValue(screenData.Title, titleFor(screen))
+	description := fallbackValue(screenData.Description, "Manage admin content.")
+	actions := []elements.Action{}
+	if screen == "headless" || screen == "settings" {
+		actions = h.playgroundActions(bundle, "/go-admin/"+screen)
+	}
 	data := views.SimpleListPageData{
 		Layout: h.layout(r, principal, title, "/go-admin/"+screen),
 		Screen: screen,
 		List: blocks.SimpleListData{
-			Title: title, Description: description, Marker: marker, Rows: rows,
-			FormAction: formAction, Token: h.token("admin-write"), Fields: fields,
+			Title:       title,
+			Description: description,
+			Marker:      marker,
+			Rows:        rows,
+			Actions:     actions,
+			FormAction:  formAction, Token: h.token("admin-write"), Fields: fields,
+			Headers:   h.simpleListHeaders(bundle),
+			OpenLabel: bundle.Label("action_open", "Open"),
+			SaveLabel: bundle.Label("action_save", "Save"),
 		},
 	}
 	_ = web.Render(r.Context(), w, views.SimpleListPage(data))
@@ -538,33 +632,79 @@ func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal 
 
 func (h Handler) layout(r *http.Request, principal authz.Principal, title string, active string) views.LayoutData {
 	resolvedAssets := assets.Resolve()
+	fixture := h.fixture(r)
+	language := view.BuildLanguageToggleFromContext(r.Context(),
+		view.WithLabel(fixture.Language.Label),
+		view.WithCurrentLabel(fixture.Language.CurrentLabel),
+		view.WithNextLocale(fixture.Language.NextLocale),
+		view.WithNextLabel(fixture.Language.NextLabel),
+		view.WithLocaleLabels(fixture.Language.LocaleLabels),
+	)
 	return views.LayoutData{
-		Title: title, Lang: "en", Brand: "GoCMS", Active: active, NavItems: h.NavItems(),
-		Account: elements.AccountActionsData{Email: principal.ID, Token: h.token("logout")},
+		Title:    title,
+		Lang:     fixture.Meta.Lang,
+		Brand:    fallbackValue(fixture.Meta.BrandName, "GoCMS"),
+		Active:   active,
+		NavItems: h.NavItemsFromBundle(fixture),
+		Account: elements.AccountActionsData{
+			Email:        principal.ID,
+			Token:        h.token("logout"),
+			SignOutLabel: fixture.Label("action_sign_out", "Sign out"),
+		},
+		Theme: view.ThemeToggleData{
+			Label:              fixture.Theme.Label,
+			SwitchToDarkLabel:  fixture.Theme.SwitchToDarkLabel,
+			SwitchToLightLabel: fixture.Theme.SwitchToLightLabel,
+		},
+		Language: language,
 		Assets: views.AssetPaths{
-			CSS:     resolvedAssets.CSS,
-			ThemeJS: resolvedAssets.ThemeJS,
-			AppJS:   resolvedAssets.AppJS,
+			CSS:          resolvedAssets.CSS,
+			ThemeJS:      resolvedAssets.ThemeJS,
+			AppJS:        resolvedAssets.AppJS,
+			PlaygroundJS: resolvedAssets.PlaygroundJS,
 		},
 	}
 }
 
-func (h Handler) contentEditor(title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
+func (h Handler) contentEditor(bundle adminfixtures.AdminFixture, title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
+	fields := h.formFieldsFromFixture(bundle, "content-editor", []blocks.FieldData{
+		{ID: "title", Name: "title", Label: "Title", Value: entry.Title.Value("en", "en"), Required: true},
+		{ID: "slug", Name: "slug", Label: "Slug", Value: entry.Slug.Value("en", "en"), Required: true},
+		{ID: "content", Name: "content", Label: "Content", Value: entry.Body.Value("en", "en"), Component: "textarea", Rows: 8},
+		{ID: "excerpt", Name: "excerpt", Label: "Excerpt", Value: entry.Excerpt.Value("en", "en"), Component: "textarea", Rows: 3},
+		{ID: "author_id", Name: "author_id", Label: "Author ID", Value: defaultValue(entry.AuthorID, "author-1")},
+		{ID: "featured_media_id", Name: "featured_media_id", Label: "Featured media ID", Value: entry.FeaturedMediaID},
+		{ID: "template", Name: "template", Label: "Template", Value: entry.Template},
+		{ID: "terms", Name: "terms", Label: "Taxonomy terms", Value: formatTerms(entry.Terms), Placeholder: "category:news,tag:go"},
+		{ID: "meta_key", Name: "meta_key", Label: "Metadata key", Placeholder: "seo_title"},
+		{ID: "meta_value", Name: "meta_value", Label: "Metadata value"},
+	})
+
+	updateFieldValue(fields, "title", entry.Title.Value("en", "en"))
+	updateFieldValue(fields, "slug", entry.Slug.Value("en", "en"))
+	updateFieldValue(fields, "content", entry.Body.Value("en", "en"))
+	updateFieldValue(fields, "excerpt", entry.Excerpt.Value("en", "en"))
+	updateFieldValue(fields, "author_id", defaultValue(entry.AuthorID, "author-1"))
+	updateFieldValue(fields, "featured_media_id", entry.FeaturedMediaID)
+	updateFieldValue(fields, "template", entry.Template)
+	updateFieldValue(fields, "terms", formatTerms(entry.Terms))
 	return blocks.ContentEditorData{
 		Title: title, Description: description, Action: action, Token: token, Status: string(defaultStatus(entry.Status)),
-		Fields: []blocks.FieldData{
-			{ID: "title", Name: "title", Label: "Title", Value: entry.Title.Value("en", "en"), Required: true},
-			{ID: "slug", Name: "slug", Label: "Slug", Value: entry.Slug.Value("en", "en"), Required: true},
-			{ID: "content", Name: "content", Label: "Content", Value: entry.Body.Value("en", "en"), Component: "textarea", Rows: 8},
-			{ID: "excerpt", Name: "excerpt", Label: "Excerpt", Value: entry.Excerpt.Value("en", "en"), Component: "textarea", Rows: 3},
-			{ID: "author_id", Name: "author_id", Label: "Author ID", Value: defaultValue(entry.AuthorID, "author-1")},
-			{ID: "featured_media_id", Name: "featured_media_id", Label: "Featured media ID", Value: entry.FeaturedMediaID},
-			{ID: "template", Name: "template", Label: "Template", Value: entry.Template},
-			{ID: "terms", Name: "terms", Label: "Taxonomy terms", Value: formatTerms(entry.Terms), Placeholder: "category:news,tag:go"},
-			{ID: "meta_key", Name: "meta_key", Label: "Metadata key", Placeholder: "seo_title"},
-			{ID: "meta_value", Name: "meta_value", Label: "Metadata value"},
-		},
-		Actions: []elements.Action{{Label: "Back", Href: contentListPath(entry.Kind), Enabled: true}},
+		Fields:        fields,
+		Actions:       []elements.Action{{Label: h.labelFromFixture(bundle, "action_back", "Back"), Href: contentListPath(entry.Kind), Enabled: true}},
+		PublishTitle:  bundle.Label("panel_publish", "Publish"),
+		StatusLabel:   bundle.Label("field_status", "Status"),
+		SaveLabel:     bundle.Label("action_save", "Save"),
+		StatusOptions: h.statusOptions(bundle),
+	}
+}
+
+func (h Handler) contentEditorFromFixture(bundle adminfixtures.AdminFixture, screen string, action string, token string, fallbackFields []blocks.FieldData) blocks.ContentEditorData {
+	return blocks.ContentEditorData{
+		Action:    action,
+		Token:     token,
+		Fields:    h.formFieldsFromFixture(bundle, screen, fallbackFields),
+		SaveLabel: bundle.Label("action_save", "Save"),
 	}
 }
 
@@ -587,6 +727,23 @@ func (h Handler) contentCount(ctx context.Context, kind domaincontent.Kind) int 
 		return 0
 	}
 	return result.Total
+}
+
+func (h Handler) dashboardCards(bundle adminfixtures.AdminFixture, values []dashboardCardValue) []blocks.StatCard {
+	result := make([]blocks.StatCard, 0, len(values))
+	for i, value := range values {
+		label := value.Key
+		if i < len(bundle.Dashboard.Cards) {
+			label = fallbackValue(bundle.Dashboard.Cards[i].Label, value.Key)
+		}
+		result = append(result, blocks.StatCard{
+			Label:       label,
+			Value:       value.Value,
+			Href:        value.Href,
+			ActionLabel: bundle.Label("action_open", "Open"),
+		})
+	}
+	return result
 }
 
 func (h Handler) token(action string) string {
@@ -717,47 +874,82 @@ func visibleStatus(value bool) string {
 	return "disabled"
 }
 
-func simpleFields(screen string) []blocks.FieldData {
-	switch screen {
-	case "content-types":
-		return []blocks.FieldData{
-			{ID: "id", Name: "id", Label: "Content type ID", Required: true, Placeholder: "product"},
-			{ID: "label", Name: "label", Label: "Label", Required: true, Placeholder: "Products"},
+func (h Handler) simpleFields(r *http.Request, screen string) []blocks.FieldData {
+	bundle := h.fixture(r)
+	return h.formFieldsFromFixture(bundle, screen, nil)
+}
+
+func (h Handler) formFieldsFromFixture(bundle adminfixtures.AdminFixture, key string, fallback []blocks.FieldData) []blocks.FieldData {
+	form, ok := bundle.Form(key)
+	if !ok || len(form.Fields) == 0 {
+		return fallback
+	}
+	return h.formFields(form.Fields)
+}
+
+func (h Handler) formFields(fields []adminfixtures.FieldFixture) []blocks.FieldData {
+	result := make([]blocks.FieldData, 0, len(fields))
+	for _, field := range fields {
+		result = append(result, blocks.FieldData{
+			ID:          field.ID,
+			Name:        field.Name,
+			Label:       field.Label,
+			Value:       field.Value,
+			Type:        field.Type,
+			Component:   field.Component,
+			Placeholder: field.Placeholder,
+			Required:    field.Required,
+			Rows:        field.Rows,
+		})
+	}
+	return result
+}
+
+func (h Handler) contentTableHeaders(bundle adminfixtures.AdminFixture) blocks.ContentTableHeaders {
+	return blocks.ContentTableHeaders{
+		Title:   bundle.Label("table_title", "Title"),
+		Slug:    bundle.Label("table_slug", "Slug"),
+		Status:  bundle.Label("table_status", "Status"),
+		Author:  bundle.Label("table_author", "Author"),
+		Actions: bundle.Label("table_actions", "Actions"),
+	}
+}
+
+func (h Handler) simpleListHeaders(bundle adminfixtures.AdminFixture) blocks.SimpleListHeaders {
+	return blocks.SimpleListHeaders{
+		Name:        bundle.Label("table_name", "Name"),
+		Description: bundle.Label("table_description", "Description"),
+		Status:      bundle.Label("table_status", "Status"),
+		Actions:     bundle.Label("table_actions", "Actions"),
+	}
+}
+
+func (h Handler) statusOptions(bundle adminfixtures.AdminFixture) []ui.FieldOption {
+	return []ui.FieldOption{
+		{Value: "draft", Label: bundle.Label("status_draft", "Draft")},
+		{Value: "published", Label: bundle.Label("status_published", "Published")},
+		{Value: "scheduled", Label: bundle.Label("status_scheduled", "Scheduled")},
+		{Value: "trashed", Label: bundle.Label("status_trashed", "Trashed")},
+	}
+}
+
+func (h Handler) labelFromFixture(bundle adminfixtures.AdminFixture, key string, fallback string) string {
+	return bundle.Label(key, fallback)
+}
+
+func fallbackValue(value string, fallback string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return fallback
+}
+
+func updateFieldValue(fields []blocks.FieldData, id string, value string) {
+	for i := range fields {
+		if fields[i].ID == id {
+			fields[i].Value = value
+			return
 		}
-	case "taxonomies":
-		return []blocks.FieldData{
-			{ID: "type", Name: "type", Label: "Taxonomy type", Required: true, Placeholder: "brand"},
-			{ID: "label", Name: "label", Label: "Label", Required: true, Placeholder: "Brands"},
-			{ID: "mode", Name: "mode", Label: "Mode", Value: "flat"},
-		}
-	case "terms":
-		return []blocks.FieldData{
-			{ID: "id", Name: "id", Label: "Term ID", Required: true, Placeholder: "term-1"},
-			{ID: "name", Name: "name", Label: "Name", Required: true},
-			{ID: "slug", Name: "slug", Label: "Slug", Required: true},
-		}
-	case "media":
-		return []blocks.FieldData{
-			{ID: "id", Name: "id", Label: "Media ID", Required: true, Placeholder: "media-1"},
-			{ID: "filename", Name: "filename", Label: "Filename", Required: true},
-			{ID: "mime_type", Name: "mime_type", Label: "MIME type", Required: true, Value: "image/jpeg"},
-			{ID: "public_url", Name: "public_url", Label: "Public URL", Required: true},
-		}
-	case "menus":
-		return []blocks.FieldData{
-			{ID: "id", Name: "id", Label: "Menu ID", Required: true, Placeholder: "primary"},
-			{ID: "name", Name: "name", Label: "Name", Required: true},
-			{ID: "location", Name: "location", Label: "Location", Required: true, Value: "primary"},
-		}
-	case "users":
-		return []blocks.FieldData{
-			{ID: "id", Name: "id", Label: "User ID", Required: true},
-			{ID: "login", Name: "login", Label: "Login", Required: true},
-			{ID: "display_name", Name: "display_name", Label: "Display name", Required: true},
-			{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true},
-		}
-	default:
-		return nil
 	}
 }
 

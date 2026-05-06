@@ -1,0 +1,262 @@
+{
+  "admin": {
+    "meta": {
+      "lang": "ru",
+      "title": "GoCMS Админка",
+      "brand_name": "GoCMS"
+    },
+    "theme": {
+      "label": "Тема",
+      "switch_to_dark_label": "Включить тёмный режим",
+      "switch_to_light_label": "Включить светлый режим"
+    },
+    "language": {
+      "label": "Язык",
+      "current_label": "RU",
+      "next_label": "EN",
+      "next_locale": "en",
+      "available": ["en", "ru"],
+      "locale_labels": {
+        "en": "EN",
+        "ru": "RU"
+      }
+    },
+    "login": {
+      "title": "Вход в GoCMS",
+      "subtitle": "Используйте демо-пользователя: admin@example.test / admin.",
+      "error_invalid_credentials": "Неверные учётные данные."
+    },
+    "navigation": [
+      {"label": "Панель", "path": "/go-admin", "icon": "home", "order": 0},
+      {"label": "Записи", "path": "/go-admin/posts", "icon": "file", "order": 1},
+      {"label": "Страницы", "path": "/go-admin/pages", "icon": "book", "order": 2},
+      {"label": "Типы контента", "path": "/go-admin/content-types", "icon": "box", "order": 3},
+      {"label": "Таксономии", "path": "/go-admin/taxonomies", "icon": "boxes", "order": 4},
+      {"label": "Медиа", "path": "/go-admin/media", "icon": "image", "order": 5},
+      {"label": "Меню", "path": "/go-admin/menus", "icon": "menu", "order": 6},
+      {"label": "Пользователи", "path": "/go-admin/users", "icon": "users", "order": 7},
+      {"label": "Авторы", "path": "/go-admin/authors", "icon": "users", "order": 8},
+      {"label": "Права", "path": "/go-admin/capabilities", "icon": "shield", "order": 9},
+      {"label": "Настройки", "path": "/go-admin/settings", "icon": "sliders", "order": 10},
+      {"label": "Headless", "path": "/go-admin/headless", "icon": "server", "order": 11}
+    ],
+    "dashboard": {
+      "title": "Панель",
+      "description": "Управляйте контентом, таксономиями, медиа, пользователями и headless-сервисами.",
+      "cards": [
+        {"label": "Записи"},
+        {"label": "Страницы"},
+        {"label": "Таксономии"},
+        {"label": "Медиа"}
+      ]
+    },
+    "screens": {
+      "dashboard": {
+        "title": "Панель",
+        "description": "Управляйте контентом, таксономиями, медиа, пользователями и headless-сервисами.",
+        "singular": "",
+        "form_description": ""
+      },
+      "posts": {
+        "title": "Записи",
+        "description": "Создавайте, редактируйте, публикуйте, планируйте, перемещайте в корзину и восстанавливайте контент.",
+        "singular": "Запись",
+        "form_description": "Создайте черновик и выберите состояние публикации."
+      },
+      "pages": {
+        "title": "Страницы",
+        "description": "Создавайте, редактируйте, публикуйте, планируйте, перемещайте в корзину и восстанавливайте контент.",
+        "singular": "Страница",
+        "form_description": "Создайте черновик и выберите состояние публикации."
+      },
+      "content-types": {
+        "title": "Типы контента",
+        "description": "Управляйте встроенными и пользовательскими типами контента.",
+        "singular": "Тип контента",
+        "form_description": "Настройте параметры типа контента."
+      },
+      "taxonomies": {
+        "title": "Таксономии",
+        "description": "Управляйте таксономиями и терминами.",
+        "singular": "Таксономия",
+        "form_description": "Настройте определения таксономий."
+      },
+      "terms": {
+        "title": "Термины",
+        "description": "Управляйте терминами таксономий.",
+        "singular": "Термин",
+        "form_description": "Создайте термин таксономии."
+      },
+      "media": {
+        "title": "Медиа",
+        "description": "Управляйте метаданными медиа и связями с featured media.",
+        "singular": "Медиа",
+        "form_description": "Привяжите метаданные медиа к контенту."
+      },
+      "menus": {
+        "title": "Меню",
+        "description": "Управляйте навигационными меню.",
+        "singular": "Меню",
+        "form_description": "Создайте или измените пункт меню."
+      },
+      "users": {
+        "title": "Пользователи",
+        "description": "Управляйте пользователями и состояниями аккаунтов.",
+        "singular": "Пользователь",
+        "form_description": "Управляйте пользовательскими данными."
+      },
+      "authors": {
+        "title": "Авторы",
+        "description": "Просмотр публичных авторских профилей.",
+        "singular": "Автор",
+        "form_description": "Проверьте публичные профили авторов."
+      },
+      "capabilities": {
+        "title": "Роли и возможности",
+        "description": "Просмотрите группы возможностей, применяемых на сервере.",
+        "singular": "Возможность",
+        "form_description": "Аудит доступов и ограничений."
+      },
+      "settings": {
+        "title": "Настройки",
+        "description": "Настройте публичные параметры сайта.",
+        "singular": "Настройка",
+        "form_description": "Обновите настройки сайта."
+      },
+      "headless": {
+        "title": "API и headless-настройки",
+        "description": "Проверьте режим доставки API и статус плагинов.",
+        "singular": "Headless настройка",
+        "form_description": "Просмотрите параметры API."
+      }
+    },
+    "forms": {
+      "content-editor": {
+        "fields": [
+          {"id": "title", "name": "title", "label": "Заголовок", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "slug", "name": "slug", "label": "Путь", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "content", "name": "content", "label": "Содержимое", "value": "", "type": "text", "component": "textarea", "placeholder": "", "required": false, "rows": 8},
+          {"id": "excerpt", "name": "excerpt", "label": "Краткое описание", "value": "", "type": "text", "component": "textarea", "placeholder": "", "required": false, "rows": 3},
+          {"id": "author_id", "name": "author_id", "label": "ID автора", "value": "author-1", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "featured_media_id", "name": "featured_media_id", "label": "ID избранного медиа", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0},
+          {"id": "template", "name": "template", "label": "Шаблон", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0},
+          {"id": "terms", "name": "terms", "label": "Термины", "value": "", "type": "text", "component": "", "placeholder": "category:news,tag:go", "required": false, "rows": 0},
+          {"id": "meta_key", "name": "meta_key", "label": "Ключ метаданных", "value": "", "type": "text", "component": "", "placeholder": "seo_title", "required": false, "rows": 0},
+          {"id": "meta_value", "name": "meta_value", "label": "Значение метаданных", "value": "", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0}
+        ]
+      },
+      "content-types": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "ID типа", "value": "", "type": "text", "component": "", "placeholder": "product", "required": true, "rows": 0},
+          {"id": "label", "name": "label", "label": "Название", "value": "", "type": "text", "component": "", "placeholder": "Products", "required": true, "rows": 0}
+        ]
+      },
+      "taxonomies": {
+        "fields": [
+          {"id": "type", "name": "type", "label": "Тип таксономии", "value": "", "type": "text", "component": "", "placeholder": "brand", "required": true, "rows": 0},
+          {"id": "label", "name": "label", "label": "Название", "value": "", "type": "text", "component": "", "placeholder": "Бренды", "required": true, "rows": 0},
+          {"id": "mode", "name": "mode", "label": "Режим", "value": "flat", "type": "text", "component": "", "placeholder": "", "required": false, "rows": 0}
+        ]
+      },
+      "terms": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "ID термина", "value": "", "type": "text", "component": "", "placeholder": "term-1", "required": true, "rows": 0},
+          {"id": "name", "name": "name", "label": "Название", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "slug", "name": "slug", "label": "Путь", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "media": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "ID медиа", "value": "", "type": "text", "component": "", "placeholder": "media-1", "required": true, "rows": 0},
+          {"id": "filename", "name": "filename", "label": "Имя файла", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "mime_type", "name": "mime_type", "label": "MIME тип", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "public_url", "name": "public_url", "label": "Публичный URL", "value": "", "type": "url", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "menus": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "ID меню", "value": "", "type": "text", "component": "", "placeholder": "primary", "required": true, "rows": 0},
+          {"id": "name", "name": "name", "label": "Название", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "location", "name": "location", "label": "Расположение", "value": "primary", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "users": {
+        "fields": [
+          {"id": "id", "name": "id", "label": "ID пользователя", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "login", "name": "login", "label": "Логин", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "display_name", "name": "display_name", "label": "Имя", "value": "", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "email", "name": "email", "label": "Электронная почта", "value": "", "type": "email", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "settings": {
+        "fields": [
+          {"id": "site_title", "name": "site_title", "label": "Заголовок сайта", "value": "GoCMS", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0},
+          {"id": "public_rendering", "name": "public_rendering", "label": "Публичная отрисовка", "value": "disabled", "type": "text", "component": "", "placeholder": "", "required": true, "rows": 0}
+        ]
+      },
+      "playground": {
+        "fields": []
+      }
+    },
+    "labels": {
+      "action_create": "Создать",
+      "action_edit": "Редактировать",
+      "action_save": "Сохранить",
+      "action_back": "Назад",
+      "action_sign_out": "Выйти",
+      "action_sign_in": "Войти",
+      "action_open": "Открыть",
+      "action_previous": "Назад",
+      "action_next": "Вперёд",
+      "field_email": "Email",
+      "field_password": "Пароль",
+      "field_site_title": "Заголовок сайта",
+      "field_public_rendering": "Публичная отрисовка",
+      "field_status": "Статус",
+      "panel_publish": "Публикация",
+      "table_title": "Заголовок",
+      "table_slug": "Slug",
+      "table_status": "Статус",
+      "table_author": "Автор",
+      "table_actions": "Действия",
+      "table_name": "Название",
+      "table_description": "Описание",
+      "status_draft": "Черновик",
+      "status_published": "Опубликовано",
+      "status_scheduled": "Запланировано",
+      "status_trashed": "В корзине",
+      "action_content_create": "Создайте черновик и выберите состояние публикации.",
+      "action_content_update": "Обновите содержимое и состояние публикации.",
+      "action_import_source": "Импорт из источника REST",
+      "action_import_json": "Импорт JSON с устройства",
+      "action_export_json": "Экспорт JSON в файл",
+      "action_reset": "Сбросить локальное хранилище playground",
+      "headless_rest": "REST endpoint",
+      "headless_graphql": "GraphQL endpoint",
+      "headless_rendering": "Публичная отрисовка",
+      "headless_rest_description": "/go-json/go/v2/ включен",
+      "headless_graphql_description": "Планируется как плагин Pass 4",
+      "headless_rendering_description": "Может оставаться отключенной для headless-режима",
+      "capability_content": "Контент",
+      "capability_content_description": "Создание, редактирование, публикация, планирование, удаление и восстановление",
+      "capability_taxonomies": "Таксономии",
+      "capability_taxonomies_description": "Управление и назначение терминов",
+      "capability_settings": "Настройки",
+      "capability_settings_description": "Управление приватными и публичными настройками",
+      "capability_users": "Пользователи",
+      "capability_users_description": "Управление аккаунтами и ролями",
+      "action_form_placeholder": "Сохранить",
+      "action_refresh": "Обновить из источника",
+      "validation_credentials_missing": "Требуются адрес электронной почты и пароль."
+    },
+    "playground": {
+      "import_label": "Импорт JSON с устройства",
+      "export_label": "Экспорт JSON в файл",
+      "reset_label": "Сбросить локальное хранилище playground",
+      "import_from_source": "Импорт из REST-источника",
+      "refresh_from_source": "Обновить из источника",
+      "import_limit_hint": "Первая версия импортирует до 10 записей.",
+      "missing_blob_label": "Файл медиа отсутствует в локальном хранилище."
+    }
+  }
+}

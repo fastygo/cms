@@ -60,11 +60,14 @@ func LoginPage(data LoginPageData) templ.Component {
 				}
 				ctx = templ.InitializeContext(ctx)
 				templ_7745c5c3_Err = blocks.LoginPanel(blocks.LoginPanelData{
-					Title:       data.Title,
-					Subtitle:    data.Subtitle,
-					Error:       data.Error,
-					ReturnTo:    data.ReturnTo,
-					ActionToken: data.ActionToken,
+					Title:         data.Title,
+					Subtitle:      data.Subtitle,
+					Error:         data.Error,
+					ReturnTo:      data.ReturnTo,
+					ActionToken:   data.ActionToken,
+					EmailLabel:    data.EmailLabel,
+					PasswordLabel: data.PasswordLabel,
+					SubmitLabel:   data.SubmitLabel,
 				}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -82,7 +85,7 @@ func LoginPage(data LoginPageData) templ.Component {
 		})
 		templ_7745c5c3_Err = blocks.AuthDocument(blocks.AuthDocumentProps{
 			Title: data.Title,
-			Lang:  "en",
+			Lang:  data.Lang,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -115,8 +118,8 @@ func DashboardPage(data DashboardData) templ.Component {
 		templ_7745c5c3_Err = Screen(ScreenData{
 			Layout:      data.Layout,
 			Screen:      "dashboard",
-			Title:       "Dashboard",
-			Description: "Manage GoCMS content, taxonomies, media, users, and headless delivery.",
+			Title:       data.Title,
+			Description: data.Description,
 			Body:        blocks.AdminDashboardCards(data.Cards),
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

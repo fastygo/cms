@@ -7,6 +7,7 @@ const tagPattern = /(^|[^\w])<\/?[a-z][\w:-]*(\s|>|\/)/;
 // raw HTML so the rest of the application can stay raw-tag-free.
 const allowedTagSuppliers = new Set([
   "internal/site/ui/elements/markers.templ",
+  "internal/site/ui/elements/head.templ",
   "internal/site/ui/blocks/auth_document.templ",
 ]);
 let failed = false;

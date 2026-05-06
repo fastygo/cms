@@ -14,6 +14,7 @@ import (
 	platformconfig "github.com/fastygo/cms/internal/platform/config"
 	"github.com/fastygo/cms/internal/platform/logging"
 	"github.com/fastygo/framework/pkg/app"
+	"github.com/fastygo/framework/pkg/web/locale"
 )
 
 func main() {
@@ -40,7 +41,13 @@ func main() {
 }
 
 func buildApp(cfg platformconfig.Config, logger *slog.Logger) (*app.App, error) {
-	cmsModule, err := cms.New(cfg.Framework.DataSource, cfg.Framework.SessionKey, cfg.SeedFixtures)
+	cmsModule, err := cms.NewWithOptions(cms.Options{
+		DataSource:     cfg.Framework.DataSource,
+		SessionKey:     cfg.Framework.SessionKey,
+		SeedFixtures:   cfg.SeedFixtures,
+		RuntimeProfile: cfg.RuntimeProfile,
+		StorageProfile: cfg.StorageProfile,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +56,19 @@ func buildApp(cfg platformconfig.Config, logger *slog.Logger) (*app.App, error) 
 		WithFeature(cmsModule).
 		WithFeature(system.New()).
 		WithHealthEndpoints(cfg.Framework.HealthLivePath, cfg.Framework.HealthReadyPath)
+
+	builder = builder.WithLocales(app.LocalesConfig{
+		Strategy: &locale.PathPrefixStrategy{
+			Available:       cfg.Framework.AvailableLocales,
+			Default:         cfg.Framework.DefaultLocale,
+			RedirectMissing: false,
+		},
+		Cookie: locale.CookieOptions{
+			Enabled: true,
+			Name:    "lang",
+		},
+		SPA: true,
+	})
 
 	if cfg.Framework.MetricsPath != "" {
 		builder = builder.WithMetricsEndpoint(cfg.Framework.MetricsPath)

@@ -9,7 +9,7 @@ import (
 templ LoginPage(data LoginPageData) {
 	@blocks.AuthDocument(blocks.AuthDocumentProps{
 		Title: data.Title,
-		Lang:  "en",
+		Lang:  data.Lang,
 	}) {
 		@elements.MarkerMain(elements.MarkerProps{
 			Class: "gocms-login-shell",
@@ -21,6 +21,9 @@ templ LoginPage(data LoginPageData) {
 				Error:       data.Error,
 				ReturnTo:    data.ReturnTo,
 				ActionToken: data.ActionToken,
+				EmailLabel: data.EmailLabel,
+				PasswordLabel: data.PasswordLabel,
+				SubmitLabel: data.SubmitLabel,
 			})
 		}
 	}
@@ -30,8 +33,8 @@ templ DashboardPage(data DashboardData) {
 	@Screen(ScreenData{
 		Layout: data.Layout,
 		Screen: "dashboard",
-		Title: "Dashboard",
-		Description: "Manage GoCMS content, taxonomies, media, users, and headless delivery.",
+		Title: data.Title,
+		Description: data.Description,
 		Body: blocks.AdminDashboardCards(data.Cards),
 	})
 }

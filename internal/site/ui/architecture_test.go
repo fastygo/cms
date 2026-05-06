@@ -12,6 +12,7 @@ func TestGoCMSAppTemplatesDoNotUseRawTags(t *testing.T) {
 	rawTag := regexp.MustCompile(`(^|[^\w])</?[a-z][\w:-]*(\s|>|/)`)
 	allowedSuppliers := map[string]struct{}{
 		filepath.FromSlash("internal/site/ui/elements/markers.templ"):    {},
+		filepath.FromSlash("internal/site/ui/elements/head.templ"):       {},
 		filepath.FromSlash("internal/site/ui/blocks/auth_document.templ"): {},
 	}
 	forEachFile(t, filepath.FromSlash("../../../internal/site"), func(path string, content string) {
@@ -61,6 +62,27 @@ func TestGoCMSCSSUsesApplyOnlySelectors(t *testing.T) {
 			}
 			if declaration.MatchString(line) && !strings.HasPrefix(trimmed, "@apply") {
 				t.Fatalf("%s:%d uses raw CSS declaration; app selectors must use @apply only", path, index+1)
+			}
+		}
+	})
+}
+
+func TestGoCMSDoesNotUseCustomCSSProperties(t *testing.T) {
+	customProperty := regexp.MustCompile(`^\s*--[a-z0-9-]+\s*:`)
+	forEachFile(t, filepath.FromSlash("../../../web/static/css"), func(path string, content string) {
+		if !strings.HasSuffix(path, ".css") || strings.HasSuffix(path, "tokens.css") || strings.HasSuffix(path, "input.css") {
+			return
+		}
+		if strings.Contains(filepath.ToSlash(path), "/ui8kit/") || strings.HasSuffix(path, "fonts.css") {
+			return
+		}
+		for index, line := range strings.Split(content, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "*/") {
+				continue
+			}
+			if customProperty.MatchString(line) {
+				t.Fatalf("%s:%d uses custom CSS property declaration; app-owned styles must use semantic composition via @apply", path, index+1)
 			}
 		}
 	})
