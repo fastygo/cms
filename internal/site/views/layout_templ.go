@@ -65,7 +65,7 @@ func AdminLayout(data LayoutData, body templpkg.Component) templ.Component {
 			CSSPath:        cssPath(data.Assets),
 			ThemeJSPath:    themeJSPath(data.Assets),
 			AppJSPath:      appJSPath(data.Assets),
-			HeadExtra:      elements.HeadScript(playgroundJSPath(data.Assets)),
+			HeadExtra:      elements.HeadScripts(extraHeadScripts(data.Assets)),
 			HeaderExtra:    toggles.LanguageToggle(data.Language),
 			HeaderTrailing: elements.AccountActions(data.Account),
 			ThemeToggle: ui8layout.ThemeToggleProps{
@@ -249,11 +249,11 @@ func appJSPath(paths AssetPaths) string {
 	return "/static/js/ui8kit.js"
 }
 
-func playgroundJSPath(paths AssetPaths) string {
-	if paths.PlaygroundJS != "" {
-		return paths.PlaygroundJS
+func extraHeadScripts(paths AssetPaths) []string {
+	if len(paths.ExtraHeadScripts) > 0 {
+		return paths.ExtraHeadScripts
 	}
-	return "/static/js/playground.js"
+	return nil
 }
 
 var _ = templruntime.GeneratedTemplate

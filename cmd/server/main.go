@@ -47,6 +47,9 @@ func buildApp(cfg platformconfig.Config, logger *slog.Logger) (*app.App, error) 
 		SeedFixtures:   cfg.SeedFixtures,
 		RuntimeProfile: cfg.RuntimeProfile,
 		StorageProfile: cfg.StorageProfile,
+		ActivePlugins:  cfg.ActivePlugins,
+		SitePackageDir: cfg.SitePackageDir,
+		PlaygroundAuth: cfg.PlaygroundAuth,
 	})
 	if err != nil {
 		return nil, err

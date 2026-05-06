@@ -73,10 +73,10 @@ func TestAdminUsesVersionedAssetsWhenManifestExists(t *testing.T) {
 	defer closeFn()
 
 	manifest := map[string]string{
-		"/static/css/app.css":       "/static/css/app.testhash123.css",
-		"/static/js/theme.js":       "/static/js/theme.testhash123.js",
-		"/static/js/ui8kit.js":      "/static/js/ui8kit.testhash123.js",
-		"/static/js/playground.js":  "/static/js/playground.testhash123.js",
+		"/static/css/app.css":     "/static/css/app.testhash123.css",
+		"/static/js/theme.js":     "/static/js/theme.testhash123.js",
+		"/static/js/ui8kit.js":    "/static/js/ui8kit.testhash123.js",
+		"/static/js/snapshots.js": "/static/js/snapshots.testhash123.js",
 	}
 	writeManifest(t, manifest)
 
@@ -187,6 +187,36 @@ func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	mux.ServeHTTP(save, saveReq)
 	if save.Code != http.StatusSeeOther {
 		t.Fatalf("expected settings redirect, got %d: %s", save.Code, save.Body.String())
+	}
+}
+
+func TestAdminLoadsPluginActionsAndSnapshotExport(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	settings := httptest.NewRecorder()
+	settingsReq := httptest.NewRequest(http.MethodGet, "/go-admin/settings", nil)
+	settingsReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(settings, settingsReq)
+	if settings.Code != http.StatusOK {
+		t.Fatalf("expected settings page, got %d: %s", settings.Code, settings.Body.String())
+	}
+	if !strings.Contains(settings.Body.String(), "/go-admin/plugins/json-import-export/export") {
+		t.Fatalf("expected settings page to expose json export action")
+	}
+	if !strings.Contains(settings.Body.String(), "/static/js/snapshots") {
+		t.Fatalf("expected settings page to load snapshots plugin asset")
+	}
+
+	export := httptest.NewRecorder()
+	exportReq := httptest.NewRequest(http.MethodGet, "/go-admin/plugins/json-import-export/export", nil)
+	exportReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(export, exportReq)
+	if export.Code != http.StatusOK {
+		t.Fatalf("expected export route, got %d: %s", export.Code, export.Body.String())
+	}
+	if contentType := export.Header().Get("Content-Type"); !strings.Contains(contentType, "application/json") {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
 	}
 }
 

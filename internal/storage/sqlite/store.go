@@ -432,6 +432,27 @@ func (s *Store) ListPublicSettings(ctx context.Context) ([]domainsettings.Value,
 	return result, rows.Err()
 }
 
+func (s *Store) ListSettings(ctx context.Context) ([]domainsettings.Value, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT setting_json FROM settings ORDER BY key`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []domainsettings.Value
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var value domainsettings.Value
+		if err := decode(payload, &value); err != nil {
+			return nil, err
+		}
+		result = append(result, value)
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) SaveMenu(ctx context.Context, menu domainmenus.Menu) error {
 	payload, err := encode(menu)
 	if err != nil {

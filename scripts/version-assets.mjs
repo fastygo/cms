@@ -6,7 +6,7 @@ const root = process.cwd();
 const staticRoot = join(root, "web", "static");
 const manifestPath = join(staticRoot, "asset-manifest.json");
 const cssAssets = ["web/static/css/app.css"];
-const jsAssets = ["web/static/js/playground.js"];
+const jsAssets = ["web/static/js/playground.js", "web/static/js/snapshots.js"];
 const ui8kitManifestPath = join(staticRoot, "js", "manifest.json");
 
 function versionedName(filePath, hash) {

@@ -36,6 +36,7 @@ func TestLoadUsesGoCMSStaticDir(t *testing.T) {
 }
 
 func TestLoadUsesRuntimeAndStorageProfiles(t *testing.T) {
+	t.Setenv("GOCMS_PRESET", "")
 	t.Setenv("GOCMS_RUNTIME_PROFILE", "playground")
 	t.Setenv("GOCMS_STORAGE_PROFILE", "browser-indexeddb")
 
@@ -61,3 +62,27 @@ func TestLoadUsesRuntimeAndStorageProfiles(t *testing.T) {
 	}
 }
 
+func TestLoadUsesPresetPlan(t *testing.T) {
+	t.Setenv("GOCMS_PRESET", "ssh-fixtures")
+	t.Setenv("GOCMS_RUNTIME_PROFILE", "")
+	t.Setenv("GOCMS_STORAGE_PROFILE", "")
+	t.Setenv("GOCMS_PLUGIN_SET", "")
+	t.Setenv("GOCMS_SITE_PACKAGE_DIR", filepath.FromSlash("/tmp/site-package"))
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Preset != "ssh-fixtures" {
+		t.Fatalf("Preset = %q, want ssh-fixtures", cfg.Preset)
+	}
+	if cfg.Framework.AppBind != "127.0.0.1:8080" {
+		t.Fatalf("AppBind = %q, want 127.0.0.1:8080", cfg.Framework.AppBind)
+	}
+	if cfg.SitePackageDir == "" {
+		t.Fatalf("SitePackageDir should be resolved from env")
+	}
+	if len(cfg.ActivePlugins) == 0 {
+		t.Fatalf("expected preset plugins to be resolved")
+	}
+}

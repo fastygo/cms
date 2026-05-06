@@ -24,6 +24,7 @@ import (
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/assets"
 	"github.com/fastygo/cms/internal/site/ui/blocks"
@@ -48,9 +49,11 @@ type Services struct {
 }
 
 type Handler struct {
-	services Services
-	auth     rest.Authenticator
-	secret   string
+	services       Services
+	auth           rest.Authenticator
+	secret         string
+	registry       *plugins.Registry
+	playgroundAuth bool
 }
 
 type actionToken struct {
@@ -64,8 +67,11 @@ type dashboardCardValue struct {
 	Href  string
 }
 
-func NewHandler(services Services, authenticator rest.Authenticator, secret string) Handler {
-	return Handler{services: services, auth: authenticator, secret: secret}
+func NewHandler(services Services, authenticator rest.Authenticator, secret string, registry *plugins.Registry, playgroundAuth bool) Handler {
+	if registry == nil {
+		registry = plugins.NewRegistry()
+	}
+	return Handler{services: services, auth: authenticator, secret: secret, registry: registry, playgroundAuth: playgroundAuth}
 }
 
 func (h Handler) Register(mux *http.ServeMux) {
@@ -102,17 +108,29 @@ func (h Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /go-admin/settings", h.protect(h.settingsPage))
 	mux.HandleFunc("POST /go-admin/settings", h.protect(h.settingsSave))
 	mux.HandleFunc("GET /go-admin/headless", h.protect(h.headlessPage))
+	for _, route := range h.registry.RoutesForSurface(plugins.SurfaceAdmin) {
+		if route.Protected {
+			mux.HandleFunc(route.Pattern, h.protectCapability(route.Capability, route.ProtectedHandler))
+			continue
+		}
+		mux.HandleFunc(route.Pattern, route.Handler)
+	}
 }
 
 func (h Handler) NavItems() []app.NavItem {
-	return h.NavItemsFromBundle(adminfixtures.MustLoad("en"))
+	return h.navigation(adminfixtures.MustLoad("en"), authz.Root())
 }
 
 func (h Handler) NavItemsFromBundle(bundle adminfixtures.AdminFixture) []app.NavItem {
+	return h.navigation(bundle, authz.Root())
+}
+
+func (h Handler) navigation(bundle adminfixtures.AdminFixture, principal authz.Principal) []app.NavItem {
 	items := make([]app.NavItem, 0, len(bundle.Navigation))
 	for _, item := range bundle.Navigation {
 		items = append(items, app.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon, Order: item.Order})
 	}
+	items = append(items, h.registry.AdminMenu(principal)...)
 	return items
 }
 
@@ -148,7 +166,7 @@ func (h Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fixture := h.fixture(r)
-	session, ok := fixtureSession(r.PostForm.Get("email"), r.PostForm.Get("password"))
+	session, ok := fixtureSession(r.PostForm.Get("email"), r.PostForm.Get("password"), h.playgroundAuth)
 	if !ok {
 		data := views.LoginPageData{
 			Title:         fixture.Login.Title,
@@ -181,10 +199,18 @@ func (h Handler) logoutSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) protect(next func(http.ResponseWriter, *http.Request, authz.Principal)) http.HandlerFunc {
+	return h.protectCapability("", next)
+}
+
+func (h Handler) protectCapability(capability authz.Capability, next func(http.ResponseWriter, *http.Request, authz.Principal)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := h.auth.Principal(r)
 		if !ok || !principal.Has(authz.CapabilityControlPanelAccess) {
 			http.Redirect(w, r, "/go-login?return_to="+r.URL.Path, http.StatusSeeOther)
+			return
+		}
+		if capability != "" && !principal.Has(capability) {
+			http.Error(w, "Forbidden.", http.StatusForbidden)
 			return
 		}
 		next(w, r, principal)
@@ -555,7 +581,7 @@ func (h Handler) settingsPage(w http.ResponseWriter, r *http.Request, principal 
 	screen, _ := fixture.Screen("settings")
 	title := fallbackValue(screen.Title, "Settings")
 	description := fallbackValue(screen.Description, "Configure public site settings.")
-	form.Actions = h.playgroundActions(fixture, "/go-admin/settings")
+	form.Actions = h.screenActions("settings", fixture)
 	form.Title = title
 	form.Description = description
 	_ = web.Render(r.Context(), w, views.SettingsPage(views.SettingsPageData{
@@ -594,23 +620,13 @@ func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal 
 	h.renderSimple(w, r, principal, "headless", fixture, rows, "headless-settings", nil, "")
 }
 
-func (h Handler) playgroundActions(fixture adminfixtures.AdminFixture, basePath string) []elements.Action {
-	return []elements.Action{
-		{Label: fixture.Label("action_import_source", "Import from compatibility REST source"), Href: basePath + "?playground=import-source", Style: "outline", Enabled: true},
-		{Label: fixture.Label("action_import_json", "Import JSON from device"), Href: basePath + "?playground=import-json", Style: "outline", Enabled: true},
-		{Label: fixture.Label("action_export_json", "Export JSON to device"), Href: basePath + "?playground=export-json", Style: "outline", Enabled: true},
-		{Label: fixture.Label("action_refresh", "Refresh from source"), Href: basePath + "?playground=refresh-source", Style: "outline", Enabled: true},
-		{Label: fixture.Label("action_reset", "Reset local playground storage"), Href: basePath + "?playground=reset-storage", Style: "outline", Enabled: true},
-	}
-}
-
 func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal authz.Principal, screen string, bundle adminfixtures.AdminFixture, rows []blocks.SimpleListRow, marker string, fields []blocks.FieldData, formAction string) {
 	screenData, _ := bundle.Screen(screen)
 	title := fallbackValue(screenData.Title, titleFor(screen))
 	description := fallbackValue(screenData.Description, "Manage admin content.")
 	actions := []elements.Action{}
 	if screen == "headless" || screen == "settings" {
-		actions = h.playgroundActions(bundle, "/go-admin/"+screen)
+		actions = h.screenActions(screen, bundle)
 	}
 	data := views.SimpleListPageData{
 		Layout: h.layout(r, principal, title, "/go-admin/"+screen),
@@ -645,7 +661,7 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 		Lang:     fixture.Meta.Lang,
 		Brand:    fallbackValue(fixture.Meta.BrandName, "GoCMS"),
 		Active:   active,
-		NavItems: h.NavItemsFromBundle(fixture),
+		NavItems: h.navigation(fixture, principal),
 		Account: elements.AccountActionsData{
 			Email:        principal.ID,
 			Token:        h.token("logout"),
@@ -658,10 +674,10 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 		},
 		Language: language,
 		Assets: views.AssetPaths{
-			CSS:          resolvedAssets.CSS,
-			ThemeJS:      resolvedAssets.ThemeJS,
-			AppJS:        resolvedAssets.AppJS,
-			PlaygroundJS: resolvedAssets.PlaygroundJS,
+			CSS:              resolvedAssets.CSS,
+			ThemeJS:          resolvedAssets.ThemeJS,
+			AppJS:            resolvedAssets.AppJS,
+			ExtraHeadScripts: h.extraAdminScripts(),
 		},
 	}
 }
@@ -762,8 +778,14 @@ func (h Handler) validToken(raw string, action string) bool {
 	return token.Action == action && time.Now().Unix() <= token.Exp
 }
 
-func fixtureSession(email string, password string) (rest.SessionData, bool) {
+func fixtureSession(email string, password string, playgroundAuth bool) (rest.SessionData, bool) {
 	principals := rest.DevBearerPrincipals()
+	if playgroundAuth {
+		if email == "admin" && password == "admin" {
+			return sessionFromPrincipal(principals["admin-token"]), true
+		}
+		return rest.SessionData{}, false
+	}
 	switch {
 	case email == "admin@example.test" && password == "admin":
 		return sessionFromPrincipal(principals["admin-token"]), true
@@ -901,6 +923,19 @@ func (h Handler) formFields(fields []adminfixtures.FieldFixture) []blocks.FieldD
 			Required:    field.Required,
 			Rows:        field.Rows,
 		})
+	}
+	return result
+}
+
+func (h Handler) screenActions(screen string, fixture adminfixtures.AdminFixture) []elements.Action {
+	return h.registry.ScreenActions(screen, fixture)
+}
+
+func (h Handler) extraAdminScripts() []string {
+	assetsList := h.registry.AssetsForSurface(plugins.SurfaceAdmin)
+	result := make([]string, 0, len(assetsList))
+	for _, asset := range assetsList {
+		result = append(result, assets.ResolvePath(asset.Path))
 	}
 	return result
 }

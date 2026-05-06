@@ -1,0 +1,95 @@
+package bootstrap
+
+import (
+	"context"
+	"fmt"
+
+	appcontent "github.com/fastygo/cms/internal/application/content"
+	"github.com/fastygo/cms/internal/application/snapshot"
+	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
+	appmedia "github.com/fastygo/cms/internal/application/media"
+	appmenus "github.com/fastygo/cms/internal/application/menus"
+	appsettings "github.com/fastygo/cms/internal/application/settings"
+	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
+	appusers "github.com/fastygo/cms/internal/application/users"
+	"github.com/fastygo/cms/internal/platform/plugins"
+	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	"github.com/fastygo/cms/internal/runtime/fixtures"
+	"github.com/fastygo/cms/internal/sitepackage/jsondir"
+	sqlitestore "github.com/fastygo/cms/internal/storage/sqlite"
+)
+
+type Store interface {
+	appcontent.Repository
+	appcontent.TypeRegistry
+	appcontenttype.Repository
+	apptaxonomy.Repository
+	apptaxonomy.EntryRepository
+	appmedia.Repository
+	appmedia.EntryRepository
+	appusers.Repository
+	appsettings.Repository
+	appmenus.Repository
+	fixtures.Store
+	snapshot.Repository
+	Init(context.Context) error
+	Close(context.Context) error
+	HealthCheck(context.Context) error
+}
+
+type ProviderPlan struct {
+	StorageProfile string
+	DataSource     string
+	SitePackageDir string
+}
+
+type Runtime struct {
+	Store          Store
+	PluginState    plugins.StateRepository
+	SitePackage    jsondir.Provider
+	ContentProvider string
+}
+
+type Registry struct{}
+
+func NewRegistry() Registry {
+	return Registry{}
+}
+
+func (Registry) Resolve(plan ProviderPlan) (Runtime, error) {
+	store, providerName, err := openStore(plan.StorageProfile, plan.DataSource)
+	if err != nil {
+		return Runtime{}, err
+	}
+	return Runtime{
+		Store:           store,
+		PluginState:     plugins.NewInMemoryStateRepository(),
+		SitePackage:     jsondir.Provider{Dir: plan.SitePackageDir},
+		ContentProvider: providerName,
+	}, nil
+}
+
+func openStore(storageProfile string, dataSource string) (Store, string, error) {
+	switch storageProfile {
+	case "", string(runtimeprofile.StorageProfileSQLite):
+		store, err := sqlitestore.Open(dataSource)
+		return store, string(runtimeprofile.StorageProfileSQLite), err
+	case string(runtimeprofile.StorageProfileMemory):
+		store, err := sqlitestore.Open("file:gocms-memory?mode=memory&cache=shared")
+		return store, string(runtimeprofile.StorageProfileMemory), err
+	case string(runtimeprofile.StorageProfileBrowserIndexedDB):
+		store, err := sqlitestore.Open("file:gocms-playground?mode=memory&cache=shared")
+		return store, string(runtimeprofile.StorageProfileBrowserIndexedDB), err
+	case string(runtimeprofile.StorageProfileJSONFixtures):
+		store, err := sqlitestore.Open("file:gocms-json-fixtures?mode=memory&cache=shared")
+		return store, string(runtimeprofile.StorageProfileJSONFixtures), err
+	case string(runtimeprofile.StorageProfileBbolt):
+		return nil, string(runtimeprofile.StorageProfileBbolt), fmt.Errorf("bootstrap provider %q is declared but not implemented yet", runtimeprofile.StorageProfileBbolt)
+	case string(runtimeprofile.StorageProfileMySQL):
+		return nil, string(runtimeprofile.StorageProfileMySQL), fmt.Errorf("bootstrap provider %q is declared but not implemented yet", runtimeprofile.StorageProfileMySQL)
+	case string(runtimeprofile.StorageProfilePostgres):
+		return nil, string(runtimeprofile.StorageProfilePostgres), fmt.Errorf("bootstrap provider %q is declared but not implemented yet", runtimeprofile.StorageProfilePostgres)
+	default:
+		return nil, storageProfile, fmt.Errorf("bootstrap provider %q is not supported", storageProfile)
+	}
+}

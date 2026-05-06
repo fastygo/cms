@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fastygo/framework/pkg/app"
+	"github.com/fastygo/cms/internal/platform/preset"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	"github.com/fastygo/framework/pkg/app"
 )
 
 const (
@@ -20,10 +21,15 @@ const (
 
 // Config contains all runtime configuration resolved by the composition root.
 type Config struct {
-	Framework    app.Config
-	SeedFixtures bool
-	RuntimeProfile string
-	StorageProfile string
+	Framework        app.Config
+	SeedFixtures     bool
+	RuntimeProfile   string
+	StorageProfile   string
+	Preset           string
+	ActivePlugins    []string
+	SitePackageDir   string
+	PlaygroundAuth   bool
+	BrowserStateless bool
 }
 
 // Load reads environment configuration and applies GoCMS pass-0 defaults.
@@ -38,11 +44,28 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	plan := preset.Resolve(preset.Options{
+		Preset:         os.Getenv("GOCMS_PRESET"),
+		RuntimeProfile: os.Getenv("GOCMS_RUNTIME_PROFILE"),
+		StorageProfile: os.Getenv("GOCMS_STORAGE_PROFILE"),
+		AppBind:        os.Getenv("APP_BIND"),
+		DataSource:     frameworkConfig.DataSource,
+		PluginSet:      os.Getenv("GOCMS_PLUGIN_SET"),
+		SitePackageDir: os.Getenv("GOCMS_SITE_PACKAGE_DIR"),
+	})
+	frameworkConfig.AppBind = plan.AppBind
+	frameworkConfig.DataSource = plan.DataSource
+
 	return Config{
-		Framework:      frameworkConfig,
-		SeedFixtures:   parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
-		RuntimeProfile: normalizeRuntimeProfile(os.Getenv("GOCMS_RUNTIME_PROFILE")),
-		StorageProfile: normalizeStorageProfile(os.Getenv("GOCMS_STORAGE_PROFILE")),
+		Framework:        frameworkConfig,
+		SeedFixtures:     parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
+		RuntimeProfile:   plan.RuntimeProfile,
+		StorageProfile:   plan.StorageProfile,
+		Preset:           plan.Name,
+		ActivePlugins:    plan.ActivePlugins,
+		SitePackageDir:   plan.SitePackageDir,
+		PlaygroundAuth:   plan.PlaygroundAuth,
+		BrowserStateless: plan.BrowserStateless,
 	}, nil
 }
 

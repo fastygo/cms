@@ -21,10 +21,10 @@ type LayoutData struct {
 }
 
 type AssetPaths struct {
-	CSS          string
-	ThemeJS      string
-	AppJS        string
-	PlaygroundJS string
+	CSS              string
+	ThemeJS          string
+	AppJS            string
+	ExtraHeadScripts []string
 }
 
 type LoginPageData struct {

@@ -230,6 +230,8 @@
       "action_import_source": "Import from compatibility REST source",
       "action_import_json": "Import JSON from device",
       "action_export_json": "Export JSON to device",
+      "action_export_site_package": "Export site package",
+      "action_import_site_package": "Import site package",
       "action_reset": "Reset local playground storage",
       "headless_rest": "REST endpoint",
       "headless_graphql": "GraphQL endpoint",

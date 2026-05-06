@@ -16,11 +16,12 @@ const (
 	DefaultRuntimeProfile = RuntimeProfileFull
 
 	StorageProfileBrowserIndexedDB StorageProfile = "browser-indexeddb"
-	StorageProfileMemory          StorageProfile = "memory"
-	StorageProfileJSONFixtures    StorageProfile = "json-fixtures"
-	StorageProfileSQLite          StorageProfile = "sqlite"
-	StorageProfileMySQL           StorageProfile = "mysql"
-	StorageProfilePostgres        StorageProfile = "postgres"
+	StorageProfileMemory           StorageProfile = "memory"
+	StorageProfileJSONFixtures     StorageProfile = "json-fixtures"
+	StorageProfileBbolt            StorageProfile = "bbolt"
+	StorageProfileSQLite           StorageProfile = "sqlite"
+	StorageProfileMySQL            StorageProfile = "mysql"
+	StorageProfilePostgres         StorageProfile = "postgres"
 
 	DefaultStorageProfile = StorageProfileSQLite
 )
@@ -44,7 +45,7 @@ func parseRuntimeProfile(value string) RuntimeProfile {
 
 func parseStorageProfile(value string) StorageProfile {
 	switch StorageProfile(value) {
-	case StorageProfileBrowserIndexedDB, StorageProfileMemory, StorageProfileJSONFixtures, StorageProfileSQLite, StorageProfileMySQL, StorageProfilePostgres:
+	case StorageProfileBrowserIndexedDB, StorageProfileMemory, StorageProfileJSONFixtures, StorageProfileBbolt, StorageProfileSQLite, StorageProfileMySQL, StorageProfilePostgres:
 		return StorageProfile(value)
 	default:
 		return ""
@@ -70,4 +71,3 @@ func ValidateStorageProfile(value string) error {
 	}
 	return nil
 }
-

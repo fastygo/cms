@@ -48,6 +48,33 @@ func (p Principal) Has(capability Capability) bool {
 	return ok
 }
 
+// Root returns a synthetic principal with all currently declared core capabilities.
+func Root() Principal {
+	return NewPrincipal("root",
+		CapabilityControlPanelAccess,
+		CapabilityContentCreate,
+		CapabilityContentReadPrivate,
+		CapabilityContentEdit,
+		CapabilityContentEditOwn,
+		CapabilityContentEditOthers,
+		CapabilityContentPublish,
+		CapabilityContentSchedule,
+		CapabilityContentDelete,
+		CapabilityContentRestore,
+		CapabilityMediaUpload,
+		CapabilityMediaEdit,
+		CapabilityTaxonomiesManage,
+		CapabilityTaxonomiesAssign,
+		CapabilityMenusManage,
+		CapabilitySettingsManage,
+		CapabilityUsersManage,
+		CapabilityRolesManage,
+		CapabilityPluginsManage,
+		CapabilityThemesManage,
+		CapabilityPrivateAPIRead,
+	)
+}
+
 // Role is a named capability set.
 type Role struct {
 	ID           string

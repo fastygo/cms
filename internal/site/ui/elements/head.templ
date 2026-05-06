@@ -5,3 +5,9 @@ templ HeadScript(src string) {
 		<script src={ src } defer></script>
 	}
 }
+
+templ HeadScripts(paths []string) {
+	for _, path := range paths {
+		@HeadScript(path)
+	}
+}

@@ -230,6 +230,8 @@
       "action_import_source": "Импорт из источника REST",
       "action_import_json": "Импорт JSON с устройства",
       "action_export_json": "Экспорт JSON в файл",
+      "action_export_site_package": "Экспорт site package",
+      "action_import_site_package": "Импорт site package",
       "action_reset": "Сбросить локальное хранилище playground",
       "headless_rest": "REST endpoint",
       "headless_graphql": "GraphQL endpoint",

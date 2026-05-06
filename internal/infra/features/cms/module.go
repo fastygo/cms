@@ -10,22 +10,29 @@ import (
 	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmenus "github.com/fastygo/cms/internal/application/menus"
 	appsettings "github.com/fastygo/cms/internal/application/settings"
+	appsnapshot "github.com/fastygo/cms/internal/application/snapshot"
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
 	"github.com/fastygo/cms/internal/delivery/admin"
 	"github.com/fastygo/cms/internal/delivery/rest"
+	"github.com/fastygo/cms/internal/infra/bootstrap"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
+	"github.com/fastygo/cms/internal/platform/preset"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
+	jsonplugin "github.com/fastygo/cms/internal/plugins/jsonimportexport"
+	playgroundplugin "github.com/fastygo/cms/internal/plugins/playground"
 	"github.com/fastygo/cms/internal/runtime/fixtures"
-	sqlitestore "github.com/fastygo/cms/internal/storage/sqlite"
 	"github.com/fastygo/framework/pkg/app"
 )
 
 type Module struct {
-	store        *sqlitestore.Store
-	handler      rest.Handler
-	adminHandler admin.Handler
-	contentTypes appcontenttype.Service
-	seedFixtures bool
+	store          bootstrap.Store
+	handler        rest.Handler
+	adminHandler   admin.Handler
+	pluginRegistry *platformplugins.Registry
+	contentTypes   appcontenttype.Service
+	seedFixtures   bool
+	runtimeProfile string
 }
 
 type Options struct {
@@ -34,13 +41,22 @@ type Options struct {
 	SeedFixtures   bool
 	RuntimeProfile string
 	StorageProfile string
+	ActivePlugins  []string
+	SitePackageDir string
+	PlaygroundAuth bool
 }
 
 func New(dataSource string, sessionKey string, seedFixtures bool) (*Module, error) {
+	plan := preset.Resolve(preset.Options{})
 	return NewWithOptions(Options{
-		DataSource:   dataSource,
-		SessionKey:   sessionKey,
-		SeedFixtures: seedFixtures,
+		DataSource:     dataSource,
+		SessionKey:     sessionKey,
+		SeedFixtures:   seedFixtures,
+		RuntimeProfile: plan.RuntimeProfile,
+		StorageProfile: plan.StorageProfile,
+		ActivePlugins:  plan.ActivePlugins,
+		SitePackageDir: plan.SitePackageDir,
+		PlaygroundAuth: plan.PlaygroundAuth,
 	})
 }
 
@@ -51,25 +67,45 @@ func NewWithOptions(options Options) (*Module, error) {
 		dataSource = "file:gocms-playground?mode=memory&cache=shared"
 		seedFixtures = false
 	}
-	store, err := sqlitestore.Open(dataSource)
+	bootstrapRuntime, err := bootstrap.NewRegistry().Resolve(bootstrap.ProviderPlan{
+		StorageProfile: options.StorageProfile,
+		DataSource:     dataSource,
+		SitePackageDir: options.SitePackageDir,
+	})
 	if err != nil {
 		return nil, err
 	}
 	module := &Module{
-		store:        store,
-		contentTypes: appcontenttype.NewService(store),
-		seedFixtures: seedFixtures,
+		store:          bootstrapRuntime.Store,
+		contentTypes:   appcontenttype.NewService(bootstrapRuntime.Store),
+		seedFixtures:   seedFixtures,
+		runtimeProfile: options.RuntimeProfile,
 	}
 	services := rest.Services{
-		Content:      appcontent.NewService(store, store, time.Now),
+		Content:      appcontent.NewService(bootstrapRuntime.Store, bootstrapRuntime.Store, time.Now),
 		ContentTypes: module.contentTypes,
-		Taxonomy:     apptaxonomy.NewService(store, store),
-		Media:        appmedia.NewService(store, store),
-		Users:        appusers.NewService(store),
-		Settings:     appsettings.NewService(store),
-		Menus:        appmenus.NewService(store),
+		Taxonomy:     apptaxonomy.NewService(bootstrapRuntime.Store, bootstrapRuntime.Store),
+		Media:        appmedia.NewService(bootstrapRuntime.Store, bootstrapRuntime.Store),
+		Users:        appusers.NewService(bootstrapRuntime.Store),
+		Settings:     appsettings.NewService(bootstrapRuntime.Store),
+		Menus:        appmenus.NewService(bootstrapRuntime.Store),
 	}
 	authenticator := rest.NewAuthenticator(options.SessionKey, rest.DevBearerPrincipals())
+	snapshotService := appsnapshot.NewService(bootstrapRuntime.Store, time.Now)
+	pluginRuntime, err := platformplugins.NewRuntime(
+		bootstrapRuntime.PluginState,
+		jsonplugin.New(snapshotService, bootstrapRuntime.SitePackage),
+		playgroundplugin.New(),
+	)
+	if err != nil {
+		_ = bootstrapRuntime.Store.Close(context.Background())
+		return nil, err
+	}
+	module.pluginRegistry, err = pluginRuntime.Activate(context.Background(), options.ActivePlugins)
+	if err != nil {
+		_ = bootstrapRuntime.Store.Close(context.Background())
+		return nil, err
+	}
 	module.handler = rest.NewHandler(services, authenticator)
 	module.adminHandler = admin.NewHandler(admin.Services{
 		Content:      services.Content,
@@ -79,9 +115,9 @@ func NewWithOptions(options Options) (*Module, error) {
 		Users:        services.Users,
 		Settings:     services.Settings,
 		Menus:        services.Menus,
-	}, authenticator, options.SessionKey)
+	}, authenticator, options.SessionKey, module.pluginRegistry, options.PlaygroundAuth)
 	if err := module.Init(context.Background()); err != nil {
-		_ = store.Close(context.Background())
+		_ = bootstrapRuntime.Store.Close(context.Background())
 		return nil, err
 	}
 	return module, nil
@@ -97,11 +133,29 @@ func (m *Module) ID() string {
 }
 
 func (m *Module) Routes(mux *http.ServeMux) {
-	m.handler.Register(mux)
-	m.adminHandler.Register(mux)
+	if m.exposesREST() {
+		m.handler.Register(mux)
+	}
+	if m.exposesAdmin() {
+		m.adminHandler.Register(mux)
+	}
+	if m.pluginRegistry == nil {
+		return
+	}
+	if m.exposesREST() {
+		for _, route := range m.pluginRegistry.RoutesForSurface(platformplugins.SurfaceREST) {
+			mux.HandleFunc(route.Pattern, route.Handler)
+		}
+	}
+	for _, route := range m.pluginRegistry.RoutesForSurface(platformplugins.SurfacePublic) {
+		mux.HandleFunc(route.Pattern, route.Handler)
+	}
 }
 
 func (m *Module) NavItems() []app.NavItem {
+	if !m.exposesAdmin() {
+		return nil
+	}
 	return m.adminHandler.NavItems()
 }
 
@@ -124,4 +178,22 @@ func (m *Module) Close(ctx context.Context) error {
 
 func (m *Module) HealthCheck(ctx context.Context) error {
 	return m.store.HealthCheck(ctx)
+}
+
+func (m *Module) exposesREST() bool {
+	switch m.runtimeProfile {
+	case string(runtimeprofile.RuntimeProfilePlayground):
+		return false
+	default:
+		return true
+	}
+}
+
+func (m *Module) exposesAdmin() bool {
+	switch m.runtimeProfile {
+	case string(runtimeprofile.RuntimeProfileHeadless), string(runtimeprofile.RuntimeProfileConformance):
+		return false
+	default:
+		return true
+	}
 }
