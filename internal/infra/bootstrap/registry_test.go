@@ -20,6 +20,15 @@ func TestResolveUsesConfiguredBootstrapProviders(t *testing.T) {
 	if runtime.ContentProvider != "sqlite" {
 		t.Fatalf("ContentProvider = %q, want sqlite", runtime.ContentProvider)
 	}
+	if runtime.StorageProfile != "sqlite" {
+		t.Fatalf("StorageProfile = %q, want sqlite", runtime.StorageProfile)
+	}
+	if runtime.DataSource != "file:bootstrap-test?mode=memory&cache=shared" {
+		t.Fatalf("DataSource = %q, want configured data source", runtime.DataSource)
+	}
+	if runtime.SitePackageDir == "" {
+		t.Fatalf("expected site package dir metadata")
+	}
 	if !runtime.SitePackage.Enabled() {
 		t.Fatalf("expected site package provider to be enabled")
 	}

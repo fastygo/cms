@@ -86,3 +86,24 @@ func TestLoadUsesPresetPlan(t *testing.T) {
 		t.Fatalf("expected preset plugins to be resolved")
 	}
 }
+
+func TestLoadUsesPolicyOverrides(t *testing.T) {
+	t.Setenv("GOCMS_PRESET", "full")
+	t.Setenv("GOCMS_ENABLE_DEV_BEARER", "false")
+	t.Setenv("GOCMS_LOGIN_POLICY", "disabled")
+	t.Setenv("GOCMS_ADMIN_POLICY", "operator")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.EnableDevBearer {
+		t.Fatalf("EnableDevBearer = true, want false")
+	}
+	if cfg.LoginPolicy != "disabled" {
+		t.Fatalf("LoginPolicy = %q, want disabled", cfg.LoginPolicy)
+	}
+	if cfg.AdminPolicy != "operator" {
+		t.Fatalf("AdminPolicy = %q, want operator", cfg.AdminPolicy)
+	}
+}

@@ -1,0 +1,13 @@
+{
+  "id": "offline-json-sql",
+  "static": true,
+  "assets": [
+    "/static/css/app.css",
+    "/static/js/theme.js",
+    "/static/js/ui8kit.js",
+    "/static/js/snapshots.js"
+  ],
+  "directories": [
+    "/static/fonts"
+  ]
+}

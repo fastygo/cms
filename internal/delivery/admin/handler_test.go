@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/fastygo/cms/internal/infra/features/cms"
+	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 )
 
 func TestAdminAuthFlow(t *testing.T) {
@@ -217,6 +218,65 @@ func TestAdminLoadsPluginActionsAndSnapshotExport(t *testing.T) {
 	}
 	if contentType := export.Header().Get("Content-Type"); !strings.Contains(contentType, "application/json") {
 		t.Fatalf("Content-Type = %q, want application/json", contentType)
+	}
+}
+
+func TestAdminShowsRuntimeStatusFromResolvedProviders(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	status := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/runtime", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(status, req)
+	if status.Code != http.StatusOK {
+		t.Fatalf("expected runtime status, got %d: %s", status.Code, status.Body.String())
+	}
+	body := status.Body.String()
+	for _, expected := range []string{
+		`data-gocms-screen="runtime"`,
+		"Runtime status",
+		"Content provider",
+		"json-import-export",
+		"Provider switch rule",
+		"restart",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected runtime status body to contain %q", expected)
+		}
+	}
+	if !strings.Contains(body, `/go-admin/runtime`) {
+		t.Fatalf("expected registry-driven runtime navigation item")
+	}
+}
+
+func TestAdminPolicyCanDisableDevBearer(t *testing.T) {
+	module, err := cms.NewWithOptions(cms.Options{
+		DataSource:      "file:" + strings.ReplaceAll(t.Name(), "/", "-") + "?mode=memory&cache=shared",
+		SessionKey:      "admin-test-session-secret",
+		SeedFixtures:    true,
+		RuntimeProfile:  string(runtimeprofile.RuntimeProfileFull),
+		StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+		EnableDevBearer: false,
+		LoginPolicy:     "disabled",
+		AdminPolicy:     "enabled",
+		Preset:          "full",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = module.Close(t.Context())
+	}()
+
+	mux := http.NewServeMux()
+	module.Routes(mux)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("expected disabled dev bearer to redirect to login, got %d", rec.Code)
 	}
 }
 

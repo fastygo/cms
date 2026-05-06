@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/fastygo/cms/internal/domain/authz"
 	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/ui/elements"
 )
@@ -87,5 +88,28 @@ func TestRuntimeDeactivateMarksPluginInactive(t *testing.T) {
 	}
 	if states["example-plugin"].State != StateInactive {
 		t.Fatalf("plugin state = %q, want inactive", states["example-plugin"].State)
+	}
+}
+
+func TestRegistryKeepsRoutesAndCapabilityFilteredMenuTogether(t *testing.T) {
+	registry := NewRegistry()
+	registry.AddRoutes(Route{Pattern: "GET /go-admin/example", Surface: SurfaceAdmin, Protected: true})
+	registry.AddAdminMenu(AdminMenuItem{
+		ID:         "example",
+		Label:      "Example",
+		Path:       "/go-admin/example",
+		Order:      10,
+		Capability: authz.CapabilitySettingsManage,
+	})
+
+	if len(registry.RoutesForSurface(SurfaceAdmin)) != 1 {
+		t.Fatalf("expected admin route to be registered")
+	}
+	if got := registry.AdminMenuItems(authz.NewPrincipal("viewer", authz.CapabilityControlPanelAccess)); len(got) != 0 {
+		t.Fatalf("viewer menu = %v, want filtered out item", got)
+	}
+	rootItems := registry.AdminMenuItems(authz.Root())
+	if len(rootItems) != 1 || rootItems[0].ID != "example" {
+		t.Fatalf("root menu = %v, want example item", rootItems)
 	}
 }

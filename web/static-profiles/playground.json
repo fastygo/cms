@@ -1,0 +1,13 @@
+{
+  "id": "playground",
+  "static": true,
+  "assets": [
+    "/static/css/app.css",
+    "/static/js/theme.js",
+    "/static/js/ui8kit.js",
+    "/static/js/playground.js"
+  ],
+  "directories": [
+    "/static/fonts"
+  ]
+}

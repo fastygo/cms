@@ -54,6 +54,29 @@ type Handler struct {
 	secret         string
 	registry       *plugins.Registry
 	playgroundAuth bool
+	loginPolicy    string
+	runtimeInfo    RuntimeInfo
+}
+
+type RuntimeInfo struct {
+	Preset             string
+	RuntimeProfile     string
+	StorageProfile     string
+	ContentProvider    string
+	SitePackage        string
+	ActivePlugins      []string
+	BrowserStateless   bool
+	PlaygroundAuth     bool
+	EnableDevBearer    bool
+	LoginPolicy        string
+	AdminPolicy        string
+	ProviderSwitchRule string
+}
+
+type HandlerOptions struct {
+	PlaygroundAuth bool
+	LoginPolicy    string
+	RuntimeInfo    RuntimeInfo
 }
 
 type actionToken struct {
@@ -68,46 +91,96 @@ type dashboardCardValue struct {
 }
 
 func NewHandler(services Services, authenticator rest.Authenticator, secret string, registry *plugins.Registry, playgroundAuth bool) Handler {
+	return NewHandlerWithOptions(services, authenticator, secret, registry, HandlerOptions{PlaygroundAuth: playgroundAuth})
+}
+
+func NewHandlerWithOptions(services Services, authenticator rest.Authenticator, secret string, registry *plugins.Registry, options HandlerOptions) Handler {
 	if registry == nil {
 		registry = plugins.NewRegistry()
 	}
-	return Handler{services: services, auth: authenticator, secret: secret, registry: registry, playgroundAuth: playgroundAuth}
+	if options.LoginPolicy == "" {
+		options.LoginPolicy = "fixture"
+	}
+	handler := Handler{
+		services:       services,
+		auth:           authenticator,
+		secret:         secret,
+		registry:       registry,
+		playgroundAuth: options.PlaygroundAuth,
+		loginPolicy:    options.LoginPolicy,
+		runtimeInfo:    options.RuntimeInfo,
+	}
+	handler.registerCoreScreens()
+	return handler
+}
+
+func (h Handler) registerCoreScreens() {
+	for _, item := range []plugins.AdminMenuItem{
+		{ID: "dashboard", Label: "Dashboard", Path: "/go-admin", Icon: "home", Order: 0},
+		{ID: "posts", Label: "Posts", Path: "/go-admin/posts", Icon: "file", Order: 1, Capability: authz.CapabilityContentReadPrivate},
+		{ID: "pages", Label: "Pages", Path: "/go-admin/pages", Icon: "book", Order: 2, Capability: authz.CapabilityContentReadPrivate},
+		{ID: "content-types", Label: "Content types", Path: "/go-admin/content-types", Icon: "box", Order: 3, Capability: authz.CapabilitySettingsManage},
+		{ID: "taxonomies", Label: "Taxonomies", Path: "/go-admin/taxonomies", Icon: "boxes", Order: 4, Capability: authz.CapabilityTaxonomiesManage},
+		{ID: "media", Label: "Media", Path: "/go-admin/media", Icon: "image", Order: 5, Capability: authz.CapabilityMediaUpload},
+		{ID: "menus", Label: "Menus", Path: "/go-admin/menus", Icon: "menu", Order: 6, Capability: authz.CapabilityMenusManage},
+		{ID: "users", Label: "Users", Path: "/go-admin/users", Icon: "users", Order: 7, Capability: authz.CapabilityUsersManage},
+		{ID: "authors", Label: "Authors", Path: "/go-admin/authors", Icon: "users", Order: 8, Capability: authz.CapabilityContentReadPrivate},
+		{ID: "capabilities", Label: "Roles and capabilities", Path: "/go-admin/capabilities", Icon: "shield", Order: 9, Capability: authz.CapabilityRolesManage},
+		{ID: "settings", Label: "Settings", Path: "/go-admin/settings", Icon: "sliders", Order: 10, Capability: authz.CapabilitySettingsManage},
+		{ID: "headless", Label: "API and headless settings", Path: "/go-admin/headless", Icon: "server", Order: 11, Capability: authz.CapabilitySettingsManage},
+		{ID: "runtime", Label: "Runtime status", Path: "/go-admin/runtime", Icon: "server", Order: 12, Capability: authz.CapabilitySettingsManage},
+	} {
+		h.registry.AddAdminMenu(item)
+	}
+	h.registry.AddRoutes(
+		h.coreRoute("GET /go-admin", "", h.dashboard),
+		h.coreRoute("GET /go-admin/posts", authz.CapabilityContentReadPrivate, h.contentList(domaincontent.KindPost, "posts")),
+		h.coreRoute("GET /go-admin/posts/new", authz.CapabilityContentCreate, h.contentNew(domaincontent.KindPost, "posts")),
+		h.coreRoute("POST /go-admin/posts", authz.CapabilityContentCreate, h.contentCreate(domaincontent.KindPost)),
+		h.coreRoute("GET /go-admin/posts/{id}/edit", authz.CapabilityContentEdit, h.contentEdit("posts")),
+		h.coreRoute("POST /go-admin/posts/{id}", authz.CapabilityContentEdit, h.contentUpdate),
+		h.coreRoute("POST /go-admin/posts/{id}/trash", authz.CapabilityContentDelete, h.contentTrash),
+		h.coreRoute("GET /go-admin/pages", authz.CapabilityContentReadPrivate, h.contentList(domaincontent.KindPage, "pages")),
+		h.coreRoute("GET /go-admin/pages/new", authz.CapabilityContentCreate, h.contentNew(domaincontent.KindPage, "pages")),
+		h.coreRoute("POST /go-admin/pages", authz.CapabilityContentCreate, h.contentCreate(domaincontent.KindPage)),
+		h.coreRoute("GET /go-admin/pages/{id}/edit", authz.CapabilityContentEdit, h.contentEdit("pages")),
+		h.coreRoute("POST /go-admin/pages/{id}", authz.CapabilityContentEdit, h.contentUpdate),
+		h.coreRoute("POST /go-admin/pages/{id}/trash", authz.CapabilityContentDelete, h.contentTrash),
+		h.coreRoute("GET /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypesPage),
+		h.coreRoute("POST /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypeCreate),
+		h.coreRoute("GET /go-admin/taxonomies", authz.CapabilityTaxonomiesManage, h.taxonomiesPage),
+		h.coreRoute("POST /go-admin/taxonomies", authz.CapabilityTaxonomiesManage, h.taxonomyCreate),
+		h.coreRoute("GET /go-admin/taxonomies/{type}/terms", authz.CapabilityTaxonomiesManage, h.termsPage),
+		h.coreRoute("POST /go-admin/taxonomies/{type}/terms", authz.CapabilityTaxonomiesManage, h.termCreate),
+		h.coreRoute("GET /go-admin/media", authz.CapabilityMediaUpload, h.mediaPage),
+		h.coreRoute("POST /go-admin/media", authz.CapabilityMediaUpload, h.mediaSave),
+		h.coreRoute("GET /go-admin/menus", authz.CapabilityMenusManage, h.menusPage),
+		h.coreRoute("POST /go-admin/menus", authz.CapabilityMenusManage, h.menuSave),
+		h.coreRoute("GET /go-admin/users", authz.CapabilityUsersManage, h.usersPage),
+		h.coreRoute("POST /go-admin/users", authz.CapabilityUsersManage, h.userSave),
+		h.coreRoute("GET /go-admin/authors", authz.CapabilityContentReadPrivate, h.authorsPage),
+		h.coreRoute("GET /go-admin/capabilities", authz.CapabilityRolesManage, h.capabilitiesPage),
+		h.coreRoute("GET /go-admin/settings", authz.CapabilitySettingsManage, h.settingsPage),
+		h.coreRoute("POST /go-admin/settings", authz.CapabilitySettingsManage, h.settingsSave),
+		h.coreRoute("GET /go-admin/headless", authz.CapabilitySettingsManage, h.headlessPage),
+		h.coreRoute("GET /go-admin/runtime", authz.CapabilitySettingsManage, h.runtimePage),
+	)
+}
+
+func (h Handler) coreRoute(pattern string, capability authz.Capability, handler func(http.ResponseWriter, *http.Request, authz.Principal)) plugins.Route {
+	return plugins.Route{
+		Pattern:          pattern,
+		Surface:          plugins.SurfaceAdmin,
+		Capability:       capability,
+		Protected:        true,
+		ProtectedHandler: handler,
+	}
 }
 
 func (h Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /go-login", h.loginPage)
 	mux.HandleFunc("POST /go-login", h.loginSubmit)
 	mux.HandleFunc("POST /go-logout", h.logoutSubmit)
-	mux.HandleFunc("GET /go-admin", h.protect(h.dashboard))
-	mux.HandleFunc("GET /go-admin/posts", h.protect(h.contentList(domaincontent.KindPost, "posts")))
-	mux.HandleFunc("GET /go-admin/posts/new", h.protect(h.contentNew(domaincontent.KindPost, "posts")))
-	mux.HandleFunc("POST /go-admin/posts", h.protect(h.contentCreate(domaincontent.KindPost)))
-	mux.HandleFunc("GET /go-admin/posts/{id}/edit", h.protect(h.contentEdit("posts")))
-	mux.HandleFunc("POST /go-admin/posts/{id}", h.protect(h.contentUpdate))
-	mux.HandleFunc("POST /go-admin/posts/{id}/trash", h.protect(h.contentTrash))
-	mux.HandleFunc("GET /go-admin/pages", h.protect(h.contentList(domaincontent.KindPage, "pages")))
-	mux.HandleFunc("GET /go-admin/pages/new", h.protect(h.contentNew(domaincontent.KindPage, "pages")))
-	mux.HandleFunc("POST /go-admin/pages", h.protect(h.contentCreate(domaincontent.KindPage)))
-	mux.HandleFunc("GET /go-admin/pages/{id}/edit", h.protect(h.contentEdit("pages")))
-	mux.HandleFunc("POST /go-admin/pages/{id}", h.protect(h.contentUpdate))
-	mux.HandleFunc("POST /go-admin/pages/{id}/trash", h.protect(h.contentTrash))
-	mux.HandleFunc("GET /go-admin/content-types", h.protect(h.contentTypesPage))
-	mux.HandleFunc("POST /go-admin/content-types", h.protect(h.contentTypeCreate))
-	mux.HandleFunc("GET /go-admin/taxonomies", h.protect(h.taxonomiesPage))
-	mux.HandleFunc("POST /go-admin/taxonomies", h.protect(h.taxonomyCreate))
-	mux.HandleFunc("GET /go-admin/taxonomies/{type}/terms", h.protect(h.termsPage))
-	mux.HandleFunc("POST /go-admin/taxonomies/{type}/terms", h.protect(h.termCreate))
-	mux.HandleFunc("GET /go-admin/media", h.protect(h.mediaPage))
-	mux.HandleFunc("POST /go-admin/media", h.protect(h.mediaSave))
-	mux.HandleFunc("GET /go-admin/menus", h.protect(h.menusPage))
-	mux.HandleFunc("POST /go-admin/menus", h.protect(h.menuSave))
-	mux.HandleFunc("GET /go-admin/users", h.protect(h.usersPage))
-	mux.HandleFunc("POST /go-admin/users", h.protect(h.userSave))
-	mux.HandleFunc("GET /go-admin/authors", h.protect(h.authorsPage))
-	mux.HandleFunc("GET /go-admin/capabilities", h.protect(h.capabilitiesPage))
-	mux.HandleFunc("GET /go-admin/settings", h.protect(h.settingsPage))
-	mux.HandleFunc("POST /go-admin/settings", h.protect(h.settingsSave))
-	mux.HandleFunc("GET /go-admin/headless", h.protect(h.headlessPage))
 	for _, route := range h.registry.RoutesForSurface(plugins.SurfaceAdmin) {
 		if route.Protected {
 			mux.HandleFunc(route.Pattern, h.protectCapability(route.Capability, route.ProtectedHandler))
@@ -126,11 +199,15 @@ func (h Handler) NavItemsFromBundle(bundle adminfixtures.AdminFixture) []app.Nav
 }
 
 func (h Handler) navigation(bundle adminfixtures.AdminFixture, principal authz.Principal) []app.NavItem {
-	items := make([]app.NavItem, 0, len(bundle.Navigation))
-	for _, item := range bundle.Navigation {
-		items = append(items, app.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon, Order: item.Order})
+	menu := h.registry.AdminMenuItems(principal)
+	items := make([]app.NavItem, 0, len(menu))
+	for _, item := range menu {
+		label := item.Label
+		if screen, ok := bundle.Screen(item.ID); ok && screen.Title != "" {
+			label = screen.Title
+		}
+		items = append(items, app.NavItem{Label: label, Path: item.Path, Icon: item.Icon, Order: item.Order})
 	}
-	items = append(items, h.registry.AdminMenu(principal)...)
 	return items
 }
 
@@ -166,7 +243,7 @@ func (h Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fixture := h.fixture(r)
-	session, ok := fixtureSession(r.PostForm.Get("email"), r.PostForm.Get("password"), h.playgroundAuth)
+	session, ok := h.sessionForLogin(r.PostForm.Get("email"), r.PostForm.Get("password"))
 	if !ok {
 		data := views.LoginPageData{
 			Title:         fixture.Login.Title,
@@ -215,6 +292,10 @@ func (h Handler) protectCapability(capability authz.Capability, next func(http.R
 		}
 		next(w, r, principal)
 	}
+}
+
+func (h Handler) sessionForLogin(email string, password string) (rest.SessionData, bool) {
+	return fixtureSession(email, password, h.loginPolicy, h.playgroundAuth)
 }
 
 func (h Handler) dashboard(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
@@ -620,6 +701,27 @@ func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal 
 	h.renderSimple(w, r, principal, "headless", fixture, rows, "headless-settings", nil, "")
 }
 
+func (h Handler) runtimePage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+	fixture := h.fixture(r)
+	info := h.runtimeInfo
+	switchRule := fallbackValue(info.ProviderSwitchRule, "Durable provider switches require export, migration, restart or redeploy, and import through the JSON/site-package handoff. They are not runtime toggles.")
+	rows := []blocks.SimpleListRow{
+		{Label: fixture.Label("runtime_preset", "Preset"), Description: valueOrUnset(info.Preset), Status: "resolved"},
+		{Label: fixture.Label("runtime_profile", "Runtime profile"), Description: valueOrUnset(info.RuntimeProfile), Status: "resolved"},
+		{Label: fixture.Label("runtime_storage", "Storage profile"), Description: valueOrUnset(info.StorageProfile), Status: "resolved"},
+		{Label: fixture.Label("runtime_content_provider", "Content provider"), Description: valueOrUnset(info.ContentProvider), Status: "resolved"},
+		{Label: fixture.Label("runtime_site_package", "Site package"), Description: valueOrUnset(info.SitePackage), Status: enabledStatus(info.SitePackage != "")},
+		{Label: fixture.Label("runtime_active_plugins", "Active plugins"), Description: strings.Join(info.ActivePlugins, ", "), Status: visibleStatus(len(info.ActivePlugins) > 0)},
+		{Label: fixture.Label("runtime_browser_stateless", "Browser stateless"), Description: boolDescription(info.BrowserStateless), Status: visibleStatus(info.BrowserStateless)},
+		{Label: fixture.Label("runtime_playground_auth", "Playground auth"), Description: boolDescription(info.PlaygroundAuth), Status: visibleStatus(info.PlaygroundAuth)},
+		{Label: fixture.Label("runtime_dev_bearer", "Dev bearer auth"), Description: boolDescription(info.EnableDevBearer), Status: visibleStatus(info.EnableDevBearer)},
+		{Label: fixture.Label("runtime_login_policy", "Login policy"), Description: valueOrUnset(info.LoginPolicy), Status: "resolved"},
+		{Label: fixture.Label("runtime_admin_policy", "Admin policy"), Description: valueOrUnset(info.AdminPolicy), Status: "resolved"},
+		{Label: fixture.Label("runtime_provider_switch_rule", "Provider switch rule"), Description: switchRule, Status: "restart-required"},
+	}
+	h.renderSimple(w, r, principal, "runtime", fixture, rows, "runtime-status", nil, "")
+}
+
 func (h Handler) renderSimple(w http.ResponseWriter, r *http.Request, principal authz.Principal, screen string, bundle adminfixtures.AdminFixture, rows []blocks.SimpleListRow, marker string, fields []blocks.FieldData, formAction string) {
 	screenData, _ := bundle.Screen(screen)
 	title := fallbackValue(screenData.Title, titleFor(screen))
@@ -778,8 +880,17 @@ func (h Handler) validToken(raw string, action string) bool {
 	return token.Action == action && time.Now().Unix() <= token.Exp
 }
 
-func fixtureSession(email string, password string, playgroundAuth bool) (rest.SessionData, bool) {
+func fixtureSession(email string, password string, loginPolicy string, playgroundAuth bool) (rest.SessionData, bool) {
 	principals := rest.DevBearerPrincipals()
+	switch strings.TrimSpace(strings.ToLower(loginPolicy)) {
+	case "playground":
+		if email == "admin" && password == "admin" {
+			return sessionFromPrincipal(principals["admin-token"]), true
+		}
+		return rest.SessionData{}, false
+	case "disabled":
+		return rest.SessionData{}, false
+	}
 	if playgroundAuth {
 		if email == "admin" && password == "admin" {
 			return sessionFromPrincipal(principals["admin-token"]), true
@@ -894,6 +1005,27 @@ func visibleStatus(value bool) string {
 		return "enabled"
 	}
 	return "disabled"
+}
+
+func enabledStatus(value bool) string {
+	if value {
+		return "enabled"
+	}
+	return "disabled"
+}
+
+func boolDescription(value bool) string {
+	if value {
+		return "enabled"
+	}
+	return "disabled"
+}
+
+func valueOrUnset(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "not configured"
+	}
+	return value
 }
 
 func (h Handler) simpleFields(r *http.Request, screen string) []blocks.FieldData {

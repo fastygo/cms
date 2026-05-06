@@ -19,15 +19,40 @@ type Authenticator struct {
 	BearerTokens map[string]domainauthz.Principal
 }
 
+type AuthenticatorOptions struct {
+	SessionName     string
+	SessionPath     string
+	SessionTTL      time.Duration
+	SessionSecure   bool
+	SessionSameSite http.SameSite
+}
+
 func NewAuthenticator(sessionSecret string, bearerTokens map[string]domainauthz.Principal) Authenticator {
+	return NewAuthenticatorWithOptions(sessionSecret, bearerTokens, AuthenticatorOptions{})
+}
+
+func NewAuthenticatorWithOptions(sessionSecret string, bearerTokens map[string]domainauthz.Principal, options AuthenticatorOptions) Authenticator {
+	if options.SessionName == "" {
+		options.SessionName = "gocms_session"
+	}
+	if options.SessionPath == "" {
+		options.SessionPath = "/"
+	}
+	if options.SessionTTL <= 0 {
+		options.SessionTTL = 12 * time.Hour
+	}
+	if options.SessionSameSite == 0 {
+		options.SessionSameSite = http.SameSiteLaxMode
+	}
 	return Authenticator{
 		Session: auth.CookieSession[SessionData]{
-			Name:     "gocms_session",
-			Path:     "/",
+			Name:     options.SessionName,
+			Path:     options.SessionPath,
 			Secret:   sessionSecret,
-			TTL:      12 * time.Hour,
+			TTL:      options.SessionTTL,
 			HTTPOnly: true,
-			SameSite: http.SameSiteLaxMode,
+			Secure:   options.SessionSecure,
+			SameSite: options.SessionSameSite,
 		},
 		BearerTokens: bearerTokens,
 	}

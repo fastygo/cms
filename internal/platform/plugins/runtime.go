@@ -27,8 +27,8 @@ const (
 type Surface string
 
 const (
-	SurfaceAdmin Surface = "admin"
-	SurfaceREST  Surface = "rest"
+	SurfaceAdmin  Surface = "admin"
+	SurfaceREST   Surface = "rest"
 	SurfacePublic Surface = "public"
 )
 
@@ -76,11 +76,11 @@ type SettingDefinition struct {
 }
 
 type HookRegistration struct {
-	HookID   string
+	HookID    string
 	HandlerID string
-	OwnerID  string
-	Category string
-	Priority int
+	OwnerID   string
+	Category  string
+	Priority  int
 }
 
 type Asset struct {
@@ -113,13 +113,13 @@ type Route struct {
 }
 
 type Registry struct {
-	adminMenu      []AdminMenuItem
-	screenActions  map[string][]ScreenActionRegistration
-	routes         []Route
-	assets         []Asset
-	capabilities   []CapabilityDefinition
-	settings       []SettingDefinition
-	hooks          []HookRegistration
+	adminMenu     []AdminMenuItem
+	screenActions map[string][]ScreenActionRegistration
+	routes        []Route
+	assets        []Asset
+	capabilities  []CapabilityDefinition
+	settings      []SettingDefinition
+	hooks         []HookRegistration
 }
 
 func NewRegistry() *Registry {
@@ -163,6 +163,18 @@ func (r *Registry) AdminMenu(principal authz.Principal) []app.NavItem {
 			continue
 		}
 		items = append(items, app.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon, Order: item.Order})
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Order < items[j].Order })
+	return items
+}
+
+func (r *Registry) AdminMenuItems(principal authz.Principal) []AdminMenuItem {
+	items := make([]AdminMenuItem, 0, len(r.adminMenu))
+	for _, item := range r.adminMenu {
+		if item.Capability != "" && !principal.Has(item.Capability) {
+			continue
+		}
+		items = append(items, item)
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Order < items[j].Order })
 	return items

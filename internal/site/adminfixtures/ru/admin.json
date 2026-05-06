@@ -128,6 +128,12 @@
         "description": "Проверьте режим доставки API и статус плагинов.",
         "singular": "Headless настройка",
         "form_description": "Просмотрите параметры API."
+      },
+      "runtime": {
+        "title": "Статус runtime",
+        "description": "Проверьте текущий preset, bootstrap provider, активные плагины и правила смены provider.",
+        "singular": "Параметр runtime",
+        "form_description": "Просмотрите runtime-конфигурацию деплоя."
       }
     },
     "forms": {
@@ -239,6 +245,18 @@
       "headless_rest_description": "/go-json/go/v2/ включен",
       "headless_graphql_description": "Планируется как плагин Pass 4",
       "headless_rendering_description": "Может оставаться отключенной для headless-режима",
+      "runtime_preset": "Preset",
+      "runtime_profile": "Runtime profile",
+      "runtime_storage": "Storage profile",
+      "runtime_content_provider": "Content provider",
+      "runtime_site_package": "Site package",
+      "runtime_active_plugins": "Активные плагины",
+      "runtime_browser_stateless": "Browser stateless",
+      "runtime_playground_auth": "Playground auth",
+      "runtime_dev_bearer": "Dev bearer auth",
+      "runtime_login_policy": "Login policy",
+      "runtime_admin_policy": "Admin policy",
+      "runtime_provider_switch_rule": "Правило смены provider",
       "capability_content": "Контент",
       "capability_content_description": "Создание, редактирование, публикация, планирование, удаление и восстановление",
       "capability_taxonomies": "Таксономии",

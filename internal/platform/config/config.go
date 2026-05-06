@@ -30,6 +30,9 @@ type Config struct {
 	SitePackageDir   string
 	PlaygroundAuth   bool
 	BrowserStateless bool
+	EnableDevBearer  bool
+	LoginPolicy      string
+	AdminPolicy      string
 }
 
 // Load reads environment configuration and applies GoCMS pass-0 defaults.
@@ -45,13 +48,16 @@ func Load() (Config, error) {
 	}
 
 	plan := preset.Resolve(preset.Options{
-		Preset:         os.Getenv("GOCMS_PRESET"),
-		RuntimeProfile: os.Getenv("GOCMS_RUNTIME_PROFILE"),
-		StorageProfile: os.Getenv("GOCMS_STORAGE_PROFILE"),
-		AppBind:        os.Getenv("APP_BIND"),
-		DataSource:     frameworkConfig.DataSource,
-		PluginSet:      os.Getenv("GOCMS_PLUGIN_SET"),
-		SitePackageDir: os.Getenv("GOCMS_SITE_PACKAGE_DIR"),
+		Preset:          os.Getenv("GOCMS_PRESET"),
+		RuntimeProfile:  os.Getenv("GOCMS_RUNTIME_PROFILE"),
+		StorageProfile:  os.Getenv("GOCMS_STORAGE_PROFILE"),
+		AppBind:         os.Getenv("APP_BIND"),
+		DataSource:      frameworkConfig.DataSource,
+		PluginSet:       os.Getenv("GOCMS_PLUGIN_SET"),
+		SitePackageDir:  os.Getenv("GOCMS_SITE_PACKAGE_DIR"),
+		EnableDevBearer: os.Getenv("GOCMS_ENABLE_DEV_BEARER"),
+		LoginPolicy:     os.Getenv("GOCMS_LOGIN_POLICY"),
+		AdminPolicy:     os.Getenv("GOCMS_ADMIN_POLICY"),
 	})
 	frameworkConfig.AppBind = plan.AppBind
 	frameworkConfig.DataSource = plan.DataSource
@@ -66,6 +72,9 @@ func Load() (Config, error) {
 		SitePackageDir:   plan.SitePackageDir,
 		PlaygroundAuth:   plan.PlaygroundAuth,
 		BrowserStateless: plan.BrowserStateless,
+		EnableDevBearer:  plan.EnableDevBearer,
+		LoginPolicy:      plan.LoginPolicy,
+		AdminPolicy:      plan.AdminPolicy,
 	}, nil
 }
 

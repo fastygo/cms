@@ -128,6 +128,12 @@
         "description": "Inspect API delivery mode and upcoming plugin state.",
         "singular": "Headless setting",
         "form_description": "Review API surface configuration."
+      },
+      "runtime": {
+        "title": "Runtime status",
+        "description": "Inspect the resolved preset, bootstrap provider, active plugins, and provider switch rules.",
+        "singular": "Runtime item",
+        "form_description": "Review deployment-time runtime configuration."
       }
     },
     "forms": {
@@ -239,6 +245,18 @@
       "headless_rest_description": "/go-json/go/v2/ is enabled",
       "headless_graphql_description": "Planned as Pass 4 plugin",
       "headless_rendering_description": "Can remain disabled for headless mode",
+      "runtime_preset": "Preset",
+      "runtime_profile": "Runtime profile",
+      "runtime_storage": "Storage profile",
+      "runtime_content_provider": "Content provider",
+      "runtime_site_package": "Site package",
+      "runtime_active_plugins": "Active plugins",
+      "runtime_browser_stateless": "Browser stateless",
+      "runtime_playground_auth": "Playground auth",
+      "runtime_dev_bearer": "Dev bearer auth",
+      "runtime_login_policy": "Login policy",
+      "runtime_admin_policy": "Admin policy",
+      "runtime_provider_switch_rule": "Provider switch rule",
       "capability_content": "Content",
       "capability_content_description": "Create, edit, publish, schedule, trash, restore",
       "capability_taxonomies": "Taxonomies",

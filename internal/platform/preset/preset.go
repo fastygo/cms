@@ -21,25 +21,31 @@ const (
 var DefaultPreset = string(PresetFull)
 
 type Plan struct {
-	Name            string
+	Name             string
+	RuntimeProfile   string
+	StorageProfile   string
+	AppBind          string
+	DataSource       string
+	ActivePlugins    []string
+	SitePackageDir   string
+	PlaygroundAuth   bool
+	BrowserStateless bool
+	EnableDevBearer  bool
+	LoginPolicy      string
+	AdminPolicy      string
+}
+
+type Options struct {
+	Preset          string
 	RuntimeProfile  string
 	StorageProfile  string
 	AppBind         string
 	DataSource      string
-	ActivePlugins   []string
+	PluginSet       string
 	SitePackageDir  string
-	PlaygroundAuth  bool
-	BrowserStateless bool
-}
-
-type Options struct {
-	Preset         string
-	RuntimeProfile string
-	StorageProfile string
-	AppBind        string
-	DataSource     string
-	PluginSet      string
-	SitePackageDir string
+	EnableDevBearer string
+	LoginPolicy     string
+	AdminPolicy     string
 }
 
 func Resolve(options Options) Plan {
@@ -58,6 +64,15 @@ func Resolve(options Options) Plan {
 	}
 	if value := normalizePlugins(options.PluginSet); len(value) > 0 {
 		plan.ActivePlugins = value
+	}
+	if value, ok := parseBoolOverride(options.EnableDevBearer); ok {
+		plan.EnableDevBearer = value
+	}
+	if value := strings.TrimSpace(strings.ToLower(options.LoginPolicy)); value != "" {
+		plan.LoginPolicy = value
+	}
+	if value := strings.TrimSpace(strings.ToLower(options.AdminPolicy)); value != "" {
+		plan.AdminPolicy = value
 	}
 	if value := strings.TrimSpace(options.SitePackageDir); value != "" {
 		plan.SitePackageDir = value
@@ -92,27 +107,36 @@ func defaults(name string) Plan {
 	switch Name(name) {
 	case PresetOfflineJSONSQL:
 		return Plan{
-			Name:           name,
-			RuntimeProfile: string(runtimeprofile.RuntimeProfileAdmin),
-			StorageProfile: string(runtimeprofile.StorageProfileSQLite),
-			AppBind:        "127.0.0.1:8080",
-			ActivePlugins:  []string{"json-import-export"},
+			Name:            name,
+			RuntimeProfile:  string(runtimeprofile.RuntimeProfileAdmin),
+			StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+			AppBind:         "127.0.0.1:8080",
+			ActivePlugins:   []string{"json-import-export"},
+			EnableDevBearer: true,
+			LoginPolicy:     "fixture",
+			AdminPolicy:     "enabled",
 		}
 	case PresetSSHFixtures:
 		return Plan{
-			Name:           name,
-			RuntimeProfile: string(runtimeprofile.RuntimeProfileAdmin),
-			StorageProfile: string(runtimeprofile.StorageProfileSQLite),
-			AppBind:        "127.0.0.1:8080",
-			ActivePlugins:  []string{"json-import-export"},
+			Name:            name,
+			RuntimeProfile:  string(runtimeprofile.RuntimeProfileAdmin),
+			StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+			AppBind:         "127.0.0.1:8080",
+			ActivePlugins:   []string{"json-import-export"},
+			EnableDevBearer: false,
+			LoginPolicy:     "fixture",
+			AdminPolicy:     "operator",
 		}
 	case PresetHeadless:
 		return Plan{
-			Name:           name,
-			RuntimeProfile: string(runtimeprofile.RuntimeProfileHeadless),
-			StorageProfile: string(runtimeprofile.StorageProfileSQLite),
-			AppBind:        "127.0.0.1:8080",
-			ActivePlugins:  nil,
+			Name:            name,
+			RuntimeProfile:  string(runtimeprofile.RuntimeProfileHeadless),
+			StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+			AppBind:         "127.0.0.1:8080",
+			ActivePlugins:   nil,
+			EnableDevBearer: true,
+			LoginPolicy:     "disabled",
+			AdminPolicy:     "disabled",
 		}
 	case PresetPlayground:
 		return Plan{
@@ -123,14 +147,20 @@ func defaults(name string) Plan {
 			ActivePlugins:    []string{"playground"},
 			PlaygroundAuth:   true,
 			BrowserStateless: true,
+			EnableDevBearer:  false,
+			LoginPolicy:      "playground",
+			AdminPolicy:      "enabled",
 		}
 	default:
 		return Plan{
-			Name:           string(PresetFull),
-			RuntimeProfile: string(runtimeprofile.RuntimeProfileFull),
-			StorageProfile: string(runtimeprofile.StorageProfileSQLite),
-			AppBind:        "127.0.0.1:8080",
-			ActivePlugins:  []string{"json-import-export"},
+			Name:            string(PresetFull),
+			RuntimeProfile:  string(runtimeprofile.RuntimeProfileFull),
+			StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+			AppBind:         "127.0.0.1:8080",
+			ActivePlugins:   []string{"json-import-export"},
+			EnableDevBearer: true,
+			LoginPolicy:     "fixture",
+			AdminPolicy:     "enabled",
 		}
 	}
 }
@@ -177,5 +207,16 @@ func defaultDataSource(plan Plan) string {
 		default:
 			return "file:gocms.db"
 		}
+	}
+}
+
+func parseBoolOverride(raw string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true, true
+	case "0", "false", "no", "off":
+		return false, true
+	default:
+		return false, false
 	}
 }

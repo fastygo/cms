@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	appcontent "github.com/fastygo/cms/internal/application/content"
-	"github.com/fastygo/cms/internal/application/snapshot"
 	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
 	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmenus "github.com/fastygo/cms/internal/application/menus"
 	appsettings "github.com/fastygo/cms/internal/application/settings"
+	"github.com/fastygo/cms/internal/application/snapshot"
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
 	"github.com/fastygo/cms/internal/platform/plugins"
@@ -44,10 +44,13 @@ type ProviderPlan struct {
 }
 
 type Runtime struct {
-	Store          Store
-	PluginState    plugins.StateRepository
-	SitePackage    jsondir.Provider
+	Store           Store
+	PluginState     plugins.StateRepository
+	SitePackage     jsondir.Provider
 	ContentProvider string
+	StorageProfile  string
+	DataSource      string
+	SitePackageDir  string
 }
 
 type Registry struct{}
@@ -66,6 +69,9 @@ func (Registry) Resolve(plan ProviderPlan) (Runtime, error) {
 		PluginState:     plugins.NewInMemoryStateRepository(),
 		SitePackage:     jsondir.Provider{Dir: plan.SitePackageDir},
 		ContentProvider: providerName,
+		StorageProfile:  plan.StorageProfile,
+		DataSource:      plan.DataSource,
+		SitePackageDir:  plan.SitePackageDir,
 	}, nil
 }
 

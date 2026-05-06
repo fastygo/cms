@@ -15,6 +15,7 @@ import (
 	appusers "github.com/fastygo/cms/internal/application/users"
 	"github.com/fastygo/cms/internal/delivery/admin"
 	"github.com/fastygo/cms/internal/delivery/rest"
+	"github.com/fastygo/cms/internal/domain/authz"
 	"github.com/fastygo/cms/internal/infra/bootstrap"
 	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/platform/preset"
@@ -33,30 +34,42 @@ type Module struct {
 	contentTypes   appcontenttype.Service
 	seedFixtures   bool
 	runtimeProfile string
+	adminPolicy    string
+	runtimeInfo    admin.RuntimeInfo
 }
 
 type Options struct {
-	DataSource     string
-	SessionKey     string
-	SeedFixtures   bool
-	RuntimeProfile string
-	StorageProfile string
-	ActivePlugins  []string
-	SitePackageDir string
-	PlaygroundAuth bool
+	DataSource       string
+	SessionKey       string
+	SeedFixtures     bool
+	RuntimeProfile   string
+	StorageProfile   string
+	ActivePlugins    []string
+	SitePackageDir   string
+	PlaygroundAuth   bool
+	BrowserStateless bool
+	EnableDevBearer  bool
+	LoginPolicy      string
+	AdminPolicy      string
+	Preset           string
 }
 
 func New(dataSource string, sessionKey string, seedFixtures bool) (*Module, error) {
 	plan := preset.Resolve(preset.Options{})
 	return NewWithOptions(Options{
-		DataSource:     dataSource,
-		SessionKey:     sessionKey,
-		SeedFixtures:   seedFixtures,
-		RuntimeProfile: plan.RuntimeProfile,
-		StorageProfile: plan.StorageProfile,
-		ActivePlugins:  plan.ActivePlugins,
-		SitePackageDir: plan.SitePackageDir,
-		PlaygroundAuth: plan.PlaygroundAuth,
+		DataSource:       dataSource,
+		SessionKey:       sessionKey,
+		SeedFixtures:     seedFixtures,
+		RuntimeProfile:   plan.RuntimeProfile,
+		StorageProfile:   plan.StorageProfile,
+		ActivePlugins:    plan.ActivePlugins,
+		SitePackageDir:   plan.SitePackageDir,
+		PlaygroundAuth:   plan.PlaygroundAuth,
+		BrowserStateless: plan.BrowserStateless,
+		EnableDevBearer:  plan.EnableDevBearer,
+		LoginPolicy:      plan.LoginPolicy,
+		AdminPolicy:      plan.AdminPolicy,
+		Preset:           plan.Name,
 	})
 }
 
@@ -80,6 +93,21 @@ func NewWithOptions(options Options) (*Module, error) {
 		contentTypes:   appcontenttype.NewService(bootstrapRuntime.Store),
 		seedFixtures:   seedFixtures,
 		runtimeProfile: options.RuntimeProfile,
+		adminPolicy:    defaultString(options.AdminPolicy, "enabled"),
+		runtimeInfo: admin.RuntimeInfo{
+			Preset:             options.Preset,
+			RuntimeProfile:     options.RuntimeProfile,
+			StorageProfile:     options.StorageProfile,
+			ContentProvider:    bootstrapRuntime.ContentProvider,
+			SitePackage:        bootstrapRuntime.SitePackageDir,
+			ActivePlugins:      append([]string(nil), options.ActivePlugins...),
+			BrowserStateless:   options.BrowserStateless,
+			PlaygroundAuth:     options.PlaygroundAuth,
+			EnableDevBearer:    options.EnableDevBearer,
+			LoginPolicy:        options.LoginPolicy,
+			AdminPolicy:        defaultString(options.AdminPolicy, "enabled"),
+			ProviderSwitchRule: "Export JSON/site package first, change the bootstrap provider through deployment config, restart or redeploy, then import into the new provider.",
+		},
 	}
 	services := rest.Services{
 		Content:      appcontent.NewService(bootstrapRuntime.Store, bootstrapRuntime.Store, time.Now),
@@ -90,7 +118,11 @@ func NewWithOptions(options Options) (*Module, error) {
 		Settings:     appsettings.NewService(bootstrapRuntime.Store),
 		Menus:        appmenus.NewService(bootstrapRuntime.Store),
 	}
-	authenticator := rest.NewAuthenticator(options.SessionKey, rest.DevBearerPrincipals())
+	bearerTokens := map[string]authz.Principal(nil)
+	if options.EnableDevBearer {
+		bearerTokens = rest.DevBearerPrincipals()
+	}
+	authenticator := rest.NewAuthenticatorWithOptions(options.SessionKey, bearerTokens, rest.AuthenticatorOptions{})
 	snapshotService := appsnapshot.NewService(bootstrapRuntime.Store, time.Now)
 	pluginRuntime, err := platformplugins.NewRuntime(
 		bootstrapRuntime.PluginState,
@@ -107,7 +139,7 @@ func NewWithOptions(options Options) (*Module, error) {
 		return nil, err
 	}
 	module.handler = rest.NewHandler(services, authenticator)
-	module.adminHandler = admin.NewHandler(admin.Services{
+	module.adminHandler = admin.NewHandlerWithOptions(admin.Services{
 		Content:      services.Content,
 		ContentTypes: services.ContentTypes,
 		Taxonomy:     services.Taxonomy,
@@ -115,7 +147,11 @@ func NewWithOptions(options Options) (*Module, error) {
 		Users:        services.Users,
 		Settings:     services.Settings,
 		Menus:        services.Menus,
-	}, authenticator, options.SessionKey, module.pluginRegistry, options.PlaygroundAuth)
+	}, authenticator, options.SessionKey, module.pluginRegistry, admin.HandlerOptions{
+		PlaygroundAuth: options.PlaygroundAuth,
+		LoginPolicy:    defaultString(options.LoginPolicy, "fixture"),
+		RuntimeInfo:    module.runtimeInfo,
+	})
 	if err := module.Init(context.Background()); err != nil {
 		_ = bootstrapRuntime.Store.Close(context.Background())
 		return nil, err
@@ -190,10 +226,20 @@ func (m *Module) exposesREST() bool {
 }
 
 func (m *Module) exposesAdmin() bool {
+	if m.adminPolicy == "disabled" {
+		return false
+	}
 	switch m.runtimeProfile {
 	case string(runtimeprofile.RuntimeProfileHeadless), string(runtimeprofile.RuntimeProfileConformance):
 		return false
 	default:
 		return true
 	}
+}
+
+func defaultString(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
