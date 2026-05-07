@@ -5,7 +5,9 @@ go 1.25.0
 require (
 	github.com/a-h/templ v0.3.1001
 	github.com/fastygo/framework v0.0.0-20260428133456-8a8901eca249
+	github.com/fastygo/panel v0.0.0
 	github.com/fastygo/ui8kit v0.4.0
+	github.com/graph-gophers/graphql-go v1.9.0
 	modernc.org/sqlite v1.50.0
 )
 
@@ -18,7 +20,6 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/graph-gophers/graphql-go v1.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
@@ -35,3 +36,5 @@ require (
 )
 
 tool github.com/a-h/templ/cmd/templ
+
+replace github.com/fastygo/panel => ../@Panel

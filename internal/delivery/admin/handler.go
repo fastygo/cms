@@ -26,6 +26,7 @@ import (
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/cmspanel"
 	"github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
@@ -39,6 +40,7 @@ import (
 	"github.com/fastygo/framework/pkg/web"
 	"github.com/fastygo/framework/pkg/web/locale"
 	"github.com/fastygo/framework/pkg/web/view"
+	"github.com/fastygo/panel"
 	"github.com/fastygo/ui8kit/ui"
 )
 
@@ -141,10 +143,13 @@ func (h Handler) registerCoreScreens() {
 		Surface: plugins.SurfaceAdmin,
 		Path:    "/static/js/admin-editor.js",
 	})
+	contentRoutes := []plugins.Route{}
+	for _, resource := range cmspanel.ContentResources() {
+		h.registry.AddAdminMenu(resource.Navigation)
+		contentRoutes = append(contentRoutes, h.contentResourceRoutes(resource)...)
+	}
 	for _, item := range []plugins.AdminMenuItem{
 		{ID: "dashboard", Label: "Dashboard", Path: "/go-admin", Icon: "home", Order: 0},
-		{ID: "posts", Label: "Posts", Path: "/go-admin/posts", Icon: "file", Order: 1, Capability: authz.CapabilityContentReadPrivate},
-		{ID: "pages", Label: "Pages", Path: "/go-admin/pages", Icon: "book", Order: 2, Capability: authz.CapabilityContentReadPrivate},
 		{ID: "content-types", Label: "Content types", Path: "/go-admin/content-types", Icon: "box", Order: 3, Capability: authz.CapabilitySettingsManage},
 		{ID: "taxonomies", Label: "Taxonomies", Path: "/go-admin/taxonomies", Icon: "boxes", Order: 4, Capability: authz.CapabilityTaxonomiesManage},
 		{ID: "media", Label: "Media", Path: "/go-admin/media", Icon: "image", Order: 5, Capability: authz.CapabilityMediaUpload},
@@ -162,18 +167,6 @@ func (h Handler) registerCoreScreens() {
 	}
 	h.registry.AddRoutes(
 		h.coreRoute("GET /go-admin", "", h.dashboard),
-		h.coreRoute("GET /go-admin/posts", authz.CapabilityContentReadPrivate, h.contentList(domaincontent.KindPost, "posts")),
-		h.coreRoute("GET /go-admin/posts/new", authz.CapabilityContentCreate, h.contentNew(domaincontent.KindPost, "posts")),
-		h.coreRoute("POST /go-admin/posts", authz.CapabilityContentCreate, h.contentCreate(domaincontent.KindPost)),
-		h.coreRoute("GET /go-admin/posts/{id}/edit", authz.CapabilityContentEdit, h.contentEdit("posts")),
-		h.coreRoute("POST /go-admin/posts/{id}", authz.CapabilityContentEdit, h.contentUpdate),
-		h.coreRoute("POST /go-admin/posts/{id}/trash", authz.CapabilityContentDelete, h.contentTrash),
-		h.coreRoute("GET /go-admin/pages", authz.CapabilityContentReadPrivate, h.contentList(domaincontent.KindPage, "pages")),
-		h.coreRoute("GET /go-admin/pages/new", authz.CapabilityContentCreate, h.contentNew(domaincontent.KindPage, "pages")),
-		h.coreRoute("POST /go-admin/pages", authz.CapabilityContentCreate, h.contentCreate(domaincontent.KindPage)),
-		h.coreRoute("GET /go-admin/pages/{id}/edit", authz.CapabilityContentEdit, h.contentEdit("pages")),
-		h.coreRoute("POST /go-admin/pages/{id}", authz.CapabilityContentEdit, h.contentUpdate),
-		h.coreRoute("POST /go-admin/pages/{id}/trash", authz.CapabilityContentDelete, h.contentTrash),
 		h.coreRoute("GET /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypesPage),
 		h.coreRoute("POST /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypeCreate),
 		h.coreRoute("GET /go-admin/taxonomies", authz.CapabilityTaxonomiesManage, h.taxonomiesPage),
@@ -197,6 +190,7 @@ func (h Handler) registerCoreScreens() {
 		h.coreRoute("GET /go-admin/headless", authz.CapabilitySettingsManage, h.headlessPage),
 		h.coreRoute("GET /go-admin/runtime", authz.CapabilitySettingsManage, h.runtimePage),
 	)
+	h.registry.AddRoutes(contentRoutes...)
 }
 
 func (h Handler) coreRoute(pattern string, capability authz.Capability, handler func(http.ResponseWriter, *http.Request, authz.Principal)) plugins.Route {
@@ -207,6 +201,31 @@ func (h Handler) coreRoute(pattern string, capability authz.Capability, handler 
 		Protected:        true,
 		ProtectedHandler: handler,
 	}
+}
+
+func (h Handler) contentResourceRoutes(resource cmspanel.ContentResource) []plugins.Route {
+	routes := make([]plugins.Route, 0, len(resource.Routes))
+	for _, route := range resource.Routes {
+		var handler func(http.ResponseWriter, *http.Request, authz.Principal)
+		switch route.Role {
+		case panel.RouteIndex:
+			handler = h.contentList(resource.Kind, string(resource.ID))
+		case panel.RouteNew:
+			handler = h.contentNew(resource.Kind, string(resource.ID))
+		case panel.RouteCreate:
+			handler = h.contentCreate(resource.Kind)
+		case panel.RouteEdit:
+			handler = h.contentEdit(string(resource.ID))
+		case panel.RouteUpdate:
+			handler = h.contentUpdate
+		case panel.RouteDelete:
+			handler = h.contentTrash
+		default:
+			continue
+		}
+		routes = append(routes, h.coreRoute(route.Pattern, route.Capability, handler))
+	}
+	return routes
 }
 
 func (h Handler) Register(mux *http.ServeMux) {
@@ -352,11 +371,13 @@ func (h Handler) dashboard(w http.ResponseWriter, r *http.Request, principal aut
 
 func (h Handler) contentList(kind domaincontent.Kind, screen string) func(http.ResponseWriter, *http.Request, authz.Principal) {
 	return func(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
+		resource, _ := cmspanel.ResourceByID(screen)
 		result, _ := h.services.Content.List(r.Context(), domaincontent.Query{Kinds: []domaincontent.Kind{kind}, Page: 1, PerPage: 50, SortBy: domaincontent.SortUpdatedAt, SortDesc: true})
 		fixture := h.fixture(r)
 		screenFixture, _ := fixture.Screen(screen)
-		screenTitle := fallbackValue(screenFixture.Title, titleFor(screen))
-		screenDescription := fallbackValue(screenFixture.Description, "Create, edit, publish, schedule, trash, and restore content.")
+		screenTitle := fallbackValue(screenFixture.Title, fallbackValue(resource.Label, titleFor(screen)))
+		screenDescription := fallbackValue(screenFixture.Description, fallbackValue(resource.Description, "Create, edit, publish, schedule, trash, and restore content."))
+		basePath := fallbackValue(resource.BasePath, "/go-admin/"+screen)
 		rows := make([]blocks.ContentRow, 0, len(result.Items))
 		for _, entry := range result.Items {
 			rows = append(rows, blocks.ContentRow{
@@ -365,23 +386,23 @@ func (h Handler) contentList(kind domaincontent.Kind, screen string) func(http.R
 				Slug:    entry.Slug.Value("en", "en"),
 				Status:  string(entry.Status),
 				Author:  entry.AuthorID,
-				EditURL: "/go-admin/" + screen + "/" + string(entry.ID) + "/edit",
+				EditURL: basePath + "/" + string(entry.ID) + "/edit",
 			})
 		}
 		data := views.ContentListPageData{
-			Layout: h.layout(r, principal, screenTitle, "/go-admin/"+screen),
+			Layout: h.layout(r, principal, screenTitle, basePath),
 			Screen: screen,
 			Table: blocks.ContentTableData{
 				Title:       screenTitle,
 				Description: screenDescription,
 				Rows:        rows,
-				Actions:     []elements.Action{{Label: h.labelFromFixture(fixture, "action_create", "Create"), Href: "/go-admin/" + screen + "/new", Enabled: principal.Has(authz.CapabilityContentCreate)}},
+				Actions:     h.panelActions(fixture, principal, resource.Actions),
 				Pagination: elements.PaginationData{
-					Page: 1, TotalPages: 1, BaseHref: "/go-admin/" + screen,
+					Page: 1, TotalPages: 1, BaseHref: basePath,
 					PreviousLabel: fixture.Label("action_previous", "Previous"),
 					NextLabel:     fixture.Label("action_next", "Next"),
 				},
-				Headers:   h.contentTableHeaders(fixture),
+				Headers:   h.contentTableHeadersFromSchema(fixture, resource.Table),
 				EditLabel: fixture.Label("action_edit", "Edit"),
 			},
 		}
@@ -397,12 +418,14 @@ func (h Handler) contentNew(kind domaincontent.Kind, screen string) func(http.Re
 		}
 		fixture := h.fixture(r)
 		screenFixture, _ := fixture.Screen(screen)
-		singularName := fallbackValue(screenFixture.Singular, singular(screen))
+		resource, _ := cmspanel.ResourceByID(screen)
+		singularName := fallbackValue(screenFixture.Singular, fallbackValue(resource.Singular, singular(screen)))
 		description := fallbackValue(screenFixture.FormDescription, h.labelFromFixture(fixture, "action_content_create", "Create a draft and choose publish state."))
+		basePath := fallbackValue(resource.BasePath, "/go-admin/"+screen)
 		data := views.ContentEditPageData{
-			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_new", "New")+" "+singularName, "/go-admin/"+screen),
+			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_new", "New")+" "+singularName, basePath),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor(r.Context(), fixture, "New "+singularName, description, "/go-admin/"+screen, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
+			Editor: h.contentEditor(r.Context(), fixture, "New "+singularName, description, basePath, h.token("content-write"), domaincontent.Entry{Kind: kind, Status: domaincontent.StatusDraft}),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -418,10 +441,12 @@ func (h Handler) contentEdit(screen string) func(http.ResponseWriter, *http.Requ
 		fixture := h.fixture(r)
 		screenFixture, _ := fixture.Screen(screen)
 		description := fallbackValue(screenFixture.FormDescription, h.labelFromFixture(fixture, "action_content_update", "Update content fields and publication state."))
+		resource, _ := cmspanel.ResourceByID(screen)
+		basePath := fallbackValue(resource.BasePath, "/go-admin/"+screen)
 		data := views.ContentEditPageData{
-			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), "/go-admin/"+screen),
+			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), basePath),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor(r.Context(), fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, "/go-admin/"+screen+"/"+string(entry.ID), h.token("content-write"), entry),
+			Editor: h.contentEditor(r.Context(), fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, basePath+"/"+string(entry.ID), h.token("content-write"), entry),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -933,22 +958,8 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 
 func (h Handler) contentEditor(ctx context.Context, bundle adminfixtures.AdminFixture, title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
 	editorProvider := h.activeEditorProvider(ctx)
-	fields := h.formFieldsFromFixture(bundle, "content-editor", []blocks.FieldData{
-		{ID: "title", Name: "title", Label: "Title", Value: entry.Title.Value("en", "en"), Required: true},
-		{ID: "slug", Name: "slug", Label: "Slug", Value: entry.Slug.Value("en", "en"), Required: true},
-		{
-			ID: "content", Name: "content", Label: "Content", Value: entry.Body.Value("en", "en"),
-			Component: "richtext", Rows: 12, Hint: "HTML is stored in the content field; the editor provider can be swapped later.",
-			Editor: &blocks.EditorData{ProviderID: editorProvider.ID},
-		},
-		{ID: "excerpt", Name: "excerpt", Label: "Excerpt", Value: entry.Excerpt.Value("en", "en"), Component: "textarea", Rows: 3},
-		{ID: "author_id", Name: "author_id", Label: "Author ID", Value: defaultValue(entry.AuthorID, "author-1")},
-		{ID: "featured_media_id", Name: "featured_media_id", Label: "Featured media ID", Value: entry.FeaturedMediaID},
-		{ID: "template", Name: "template", Label: "Template", Value: entry.Template},
-		{ID: "terms", Name: "terms", Label: "Taxonomy terms", Value: formatTerms(entry.Terms), Placeholder: "category:news,tag:go"},
-		{ID: "meta_key", Name: "meta_key", Label: "Metadata key", Placeholder: "seo_title"},
-		{ID: "meta_value", Name: "meta_value", Label: "Metadata value"},
-	})
+	resource, _ := cmspanel.ResourceByKind(entry.Kind)
+	fields := h.formFieldsFromFixture(bundle, "content-editor", contentFormFields(resource.Form, entry, editorProvider))
 
 	updateFieldValue(fields, "title", entry.Title.Value("en", "en"))
 	updateFieldValue(fields, "slug", entry.Slug.Value("en", "en"))
@@ -1238,6 +1249,76 @@ func (h Handler) formFields(fields []adminfixtures.FieldFixture) []blocks.FieldD
 	return result
 }
 
+func contentFormFields(schema panel.FormSchema, entry domaincontent.Entry, editorProvider plugins.EditorProviderRegistration) []blocks.FieldData {
+	fields := make([]blocks.FieldData, 0, len(schema.Fields))
+	for _, field := range schema.Fields {
+		fields = append(fields, contentFieldData(field, entry, editorProvider))
+	}
+	return fields
+}
+
+func contentFieldData(field panel.Field, entry domaincontent.Entry, editorProvider plugins.EditorProviderRegistration) blocks.FieldData {
+	result := blocks.FieldData{
+		ID:          field.ID,
+		Name:        field.ID,
+		Label:       field.Label,
+		Value:       contentFieldValue(field.ID, entry),
+		Placeholder: field.Placeholder,
+		Required:    field.Required,
+		Hint:        field.Description,
+	}
+	switch field.Type {
+	case panel.FieldRichText:
+		result.Component = "richtext"
+		result.Rows = 12
+		result.Editor = &blocks.EditorData{ProviderID: editorProvider.ID}
+	case panel.FieldTextarea:
+		result.Component = "textarea"
+		result.Rows = 3
+	case panel.FieldNumber:
+		result.Type = "number"
+	case panel.FieldBoolean:
+		result.Type = "checkbox"
+	case panel.FieldHidden:
+		result.Type = "hidden"
+	case panel.FieldSelect:
+		result.Component = "select"
+		result.Options = panelOptions(field.Options)
+	}
+	return result
+}
+
+func contentFieldValue(id string, entry domaincontent.Entry) string {
+	switch id {
+	case "title":
+		return entry.Title.Value("en", "en")
+	case "slug":
+		return entry.Slug.Value("en", "en")
+	case "content":
+		return entry.Body.Value("en", "en")
+	case "excerpt":
+		return entry.Excerpt.Value("en", "en")
+	case "author_id":
+		return defaultValue(entry.AuthorID, "author-1")
+	case "featured_media_id":
+		return entry.FeaturedMediaID
+	case "template":
+		return entry.Template
+	case "terms":
+		return formatTerms(entry.Terms)
+	default:
+		return ""
+	}
+}
+
+func panelOptions(options []panel.Option) []ui.FieldOption {
+	result := make([]ui.FieldOption, 0, len(options))
+	for _, option := range options {
+		result = append(result, ui.FieldOption{Value: option.Value, Label: option.Label})
+	}
+	return result
+}
+
 func mergeFixtureFields(fields []blocks.FieldData, fallback []blocks.FieldData) []blocks.FieldData {
 	if len(fallback) == 0 {
 		return fields
@@ -1305,6 +1386,61 @@ func (h Handler) extraAdminScripts() []string {
 		result = append(result, assets.ResolvePath(asset.Path))
 	}
 	return result
+}
+
+func (h Handler) panelActions(bundle adminfixtures.AdminFixture, principal authz.Principal, actions []panel.Action[authz.Capability]) []elements.Action {
+	result := make([]elements.Action, 0, len(actions))
+	for _, action := range actions {
+		enabled := action.Capability == "" || principal.Has(action.Capability)
+		result = append(result, elements.Action{
+			Label:   h.panelActionLabel(bundle, action),
+			Href:    action.URL,
+			Style:   panelActionStyle(action.Style),
+			Enabled: enabled,
+		})
+	}
+	return result
+}
+
+func (h Handler) panelActionLabel(bundle adminfixtures.AdminFixture, action panel.Action[authz.Capability]) string {
+	switch action.ID {
+	case "create":
+		return h.labelFromFixture(bundle, "action_create", action.Label)
+	case "edit":
+		return h.labelFromFixture(bundle, "action_edit", action.Label)
+	default:
+		return action.Label
+	}
+}
+
+func panelActionStyle(style panel.ActionStyle) string {
+	switch style {
+	case panel.ActionLink:
+		return "link"
+	case panel.ActionBadge:
+		return "badge"
+	default:
+		return ""
+	}
+}
+
+func (h Handler) contentTableHeadersFromSchema(bundle adminfixtures.AdminFixture, schema panel.TableSchema[authz.Capability]) blocks.ContentTableHeaders {
+	return blocks.ContentTableHeaders{
+		Title:   bundle.Label("table_title", panelColumnLabel(schema, "title", "Title")),
+		Slug:    bundle.Label("table_slug", panelColumnLabel(schema, "slug", "Slug")),
+		Status:  bundle.Label("table_status", panelColumnLabel(schema, "status", "Status")),
+		Author:  bundle.Label("table_author", panelColumnLabel(schema, "author", "Author")),
+		Actions: bundle.Label("table_actions", "Actions"),
+	}
+}
+
+func panelColumnLabel(schema panel.TableSchema[authz.Capability], id string, fallback string) string {
+	for _, column := range schema.Columns {
+		if column.ID == id && strings.TrimSpace(column.Label) != "" {
+			return column.Label
+		}
+	}
+	return fallback
 }
 
 func (h Handler) contentTableHeaders(bundle adminfixtures.AdminFixture) blocks.ContentTableHeaders {

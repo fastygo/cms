@@ -3,15 +3,14 @@ package plugins
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/fastygo/cms/internal/domain/authz"
 	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/ui/elements"
 	"github.com/fastygo/framework/pkg/app"
+	"github.com/fastygo/panel"
 )
 
 type State string
@@ -24,13 +23,13 @@ const (
 	StateUninstalled State = "uninstalled"
 )
 
-type Surface string
-
 const (
-	SurfaceAdmin  Surface = "admin"
-	SurfaceREST   Surface = "rest"
-	SurfacePublic Surface = "public"
+	SurfaceAdmin  = panel.SurfaceAdmin
+	SurfaceREST   = panel.SurfaceREST
+	SurfacePublic = panel.SurfacePublic
 )
+
+type Surface = panel.Surface
 
 type Manifest struct {
 	ID           string
@@ -83,59 +82,34 @@ type HookRegistration struct {
 	Priority  int
 }
 
-type Asset struct {
-	ID      string
-	Surface Surface
-	Path    string
-}
-
-type AdminMenuItem struct {
-	ID         string
-	Label      string
-	Path       string
-	Icon       string
-	Order      int
-	Capability authz.Capability
-}
+type Asset = panel.Asset
+type AdminMenuItem = panel.MenuItem[authz.Capability]
 
 type ScreenActionRegistration struct {
 	ScreenID string
 	Build    func(adminfixtures.AdminFixture) []elements.Action
 }
 
-type EditorProviderRegistration struct {
-	ID          string
-	Label       string
-	Description string
-	Priority    int
-}
-
-type Route struct {
-	Pattern          string
-	Surface          Surface
-	Capability       authz.Capability
-	Protected        bool
-	Handler          http.HandlerFunc
-	ProtectedHandler func(http.ResponseWriter, *http.Request, authz.Principal)
-}
+type EditorProviderRegistration = panel.EditorProviderRegistration
+type Route = panel.Route[authz.Principal, authz.Capability]
 
 type Registry struct {
-	adminMenu       []AdminMenuItem
-	screenActions   map[string][]ScreenActionRegistration
-	editorProviders []EditorProviderRegistration
-	routes          []Route
-	assets          []Asset
-	capabilities    []CapabilityDefinition
-	settings        []SettingDefinition
-	hooks           []HookRegistration
+	panel         *panel.Registry[authz.Principal, authz.Capability]
+	screenActions map[string][]ScreenActionRegistration
+	capabilities  []CapabilityDefinition
+	settings      []SettingDefinition
+	hooks         []HookRegistration
 }
 
 func NewRegistry() *Registry {
-	return &Registry{screenActions: map[string][]ScreenActionRegistration{}}
+	return &Registry{
+		panel:         panel.NewRegistry[authz.Principal, authz.Capability](),
+		screenActions: map[string][]ScreenActionRegistration{},
+	}
 }
 
 func (r *Registry) AddAdminMenu(item AdminMenuItem) {
-	r.adminMenu = append(r.adminMenu, item)
+	r.panel.AddMenuItems(item)
 }
 
 func (r *Registry) AddScreenActions(actions ...ScreenActionRegistration) {
@@ -145,30 +119,15 @@ func (r *Registry) AddScreenActions(actions ...ScreenActionRegistration) {
 }
 
 func (r *Registry) AddEditorProviders(providers ...EditorProviderRegistration) {
-	for _, provider := range providers {
-		if strings.TrimSpace(provider.ID) == "" {
-			continue
-		}
-		replaced := false
-		for i := range r.editorProviders {
-			if r.editorProviders[i].ID == provider.ID {
-				r.editorProviders[i] = provider
-				replaced = true
-				break
-			}
-		}
-		if !replaced {
-			r.editorProviders = append(r.editorProviders, provider)
-		}
-	}
+	r.panel.AddEditorProviders(providers...)
 }
 
 func (r *Registry) AddRoutes(routes ...Route) {
-	r.routes = append(r.routes, routes...)
+	r.panel.AddRoutes(routes...)
 }
 
 func (r *Registry) AddAssets(assets ...Asset) {
-	r.assets = append(r.assets, assets...)
+	r.panel.AddAssets(assets...)
 }
 
 func (r *Registry) AddCapabilities(capabilities ...CapabilityDefinition) {
@@ -184,27 +143,16 @@ func (r *Registry) AddHooks(hooks ...HookRegistration) {
 }
 
 func (r *Registry) AdminMenu(principal authz.Principal) []app.NavItem {
-	items := make([]app.NavItem, 0, len(r.adminMenu))
-	for _, item := range r.adminMenu {
-		if item.Capability != "" && !principal.Has(item.Capability) {
-			continue
-		}
+	menu := r.panel.MenuItems(principal)
+	items := make([]app.NavItem, 0, len(menu))
+	for _, item := range menu {
 		items = append(items, app.NavItem{Label: item.Label, Path: item.Path, Icon: item.Icon, Order: item.Order})
 	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Order < items[j].Order })
 	return items
 }
 
 func (r *Registry) AdminMenuItems(principal authz.Principal) []AdminMenuItem {
-	items := make([]AdminMenuItem, 0, len(r.adminMenu))
-	for _, item := range r.adminMenu {
-		if item.Capability != "" && !principal.Has(item.Capability) {
-			continue
-		}
-		items = append(items, item)
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Order < items[j].Order })
-	return items
+	return r.panel.MenuItems(principal)
 }
 
 func (r *Registry) ScreenActions(screenID string, fixture adminfixtures.AdminFixture) []elements.Action {
@@ -217,47 +165,19 @@ func (r *Registry) ScreenActions(screenID string, fixture adminfixtures.AdminFix
 }
 
 func (r *Registry) EditorProviders() []EditorProviderRegistration {
-	items := append([]EditorProviderRegistration(nil), r.editorProviders...)
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].Priority == items[j].Priority {
-			return items[i].Label < items[j].Label
-		}
-		return items[i].Priority < items[j].Priority
-	})
-	return items
+	return r.panel.EditorProviders()
 }
 
 func (r *Registry) ResolveEditorProvider(id string) (EditorProviderRegistration, bool) {
-	items := r.EditorProviders()
-	for _, item := range items {
-		if item.ID == id {
-			return item, true
-		}
-	}
-	if len(items) == 0 {
-		return EditorProviderRegistration{}, false
-	}
-	return items[0], true
+	return r.panel.ResolveEditorProvider(id)
 }
 
 func (r *Registry) AssetsForSurface(surface Surface) []Asset {
-	result := []Asset{}
-	for _, asset := range r.assets {
-		if asset.Surface == surface {
-			result = append(result, asset)
-		}
-	}
-	return result
+	return r.panel.AssetsForSurface(surface)
 }
 
 func (r *Registry) RoutesForSurface(surface Surface) []Route {
-	result := []Route{}
-	for _, route := range r.routes {
-		if route.Surface == surface {
-			result = append(result, route)
-		}
-	}
-	return result
+	return r.panel.RoutesForSurface(surface)
 }
 
 func (r *Registry) Capabilities() []CapabilityDefinition {
