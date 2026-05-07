@@ -148,48 +148,14 @@ func (h Handler) registerCoreScreens() {
 		h.registry.AddAdminMenu(resource.Navigation)
 		contentRoutes = append(contentRoutes, h.contentResourceRoutes(resource)...)
 	}
-	for _, item := range []plugins.AdminMenuItem{
-		{ID: "dashboard", Label: "Dashboard", Path: "/go-admin", Icon: "home", Order: 0},
-		{ID: "content-types", Label: "Content types", Path: "/go-admin/content-types", Icon: "box", Order: 3, Capability: authz.CapabilitySettingsManage},
-		{ID: "taxonomies", Label: "Taxonomies", Path: "/go-admin/taxonomies", Icon: "boxes", Order: 4, Capability: authz.CapabilityTaxonomiesManage},
-		{ID: "media", Label: "Media", Path: "/go-admin/media", Icon: "image", Order: 5, Capability: authz.CapabilityMediaUpload},
-		{ID: "menus", Label: "Menus", Path: "/go-admin/menus", Icon: "menu", Order: 6, Capability: authz.CapabilityMenusManage},
-		{ID: "users", Label: "Users", Path: "/go-admin/users", Icon: "users", Order: 7, Capability: authz.CapabilityUsersManage},
-		{ID: "authors", Label: "Authors", Path: "/go-admin/authors", Icon: "users", Order: 8, Capability: authz.CapabilityContentReadPrivate},
-		{ID: "capabilities", Label: "Roles and capabilities", Path: "/go-admin/capabilities", Icon: "shield", Order: 9, Capability: authz.CapabilityRolesManage},
-		{ID: "settings", Label: "Settings", Path: "/go-admin/settings", Icon: "sliders", Order: 10, Capability: authz.CapabilitySettingsManage},
-		{ID: "themes", Label: "Themes", Path: "/go-admin/themes", Icon: "palette", Order: 11, Capability: authz.CapabilityThemesManage},
-		{ID: "permalinks", Label: "Permalinks", Path: "/go-admin/permalinks", Icon: "link", Order: 12, Capability: authz.CapabilitySettingsManage},
-		{ID: "headless", Label: "API and headless settings", Path: "/go-admin/headless", Icon: "server", Order: 13, Capability: authz.CapabilitySettingsManage},
-		{ID: "runtime", Label: "Runtime status", Path: "/go-admin/runtime", Icon: "server", Order: 14, Capability: authz.CapabilitySettingsManage},
-	} {
-		h.registry.AddAdminMenu(item)
+	pageRoutes := []plugins.Route{}
+	for _, page := range cmspanel.AdminPages() {
+		if page.Navigation.Path != "" {
+			h.registry.AddAdminMenu(page.Navigation)
+		}
+		pageRoutes = append(pageRoutes, h.adminPageRoutes(page)...)
 	}
-	h.registry.AddRoutes(
-		h.coreRoute("GET /go-admin", "", h.dashboard),
-		h.coreRoute("GET /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypesPage),
-		h.coreRoute("POST /go-admin/content-types", authz.CapabilitySettingsManage, h.contentTypeCreate),
-		h.coreRoute("GET /go-admin/taxonomies", authz.CapabilityTaxonomiesManage, h.taxonomiesPage),
-		h.coreRoute("POST /go-admin/taxonomies", authz.CapabilityTaxonomiesManage, h.taxonomyCreate),
-		h.coreRoute("GET /go-admin/taxonomies/{type}/terms", authz.CapabilityTaxonomiesManage, h.termsPage),
-		h.coreRoute("POST /go-admin/taxonomies/{type}/terms", authz.CapabilityTaxonomiesManage, h.termCreate),
-		h.coreRoute("GET /go-admin/media", authz.CapabilityMediaUpload, h.mediaPage),
-		h.coreRoute("POST /go-admin/media", authz.CapabilityMediaUpload, h.mediaSave),
-		h.coreRoute("GET /go-admin/menus", authz.CapabilityMenusManage, h.menusPage),
-		h.coreRoute("POST /go-admin/menus", authz.CapabilityMenusManage, h.menuSave),
-		h.coreRoute("GET /go-admin/users", authz.CapabilityUsersManage, h.usersPage),
-		h.coreRoute("POST /go-admin/users", authz.CapabilityUsersManage, h.userSave),
-		h.coreRoute("GET /go-admin/authors", authz.CapabilityContentReadPrivate, h.authorsPage),
-		h.coreRoute("GET /go-admin/capabilities", authz.CapabilityRolesManage, h.capabilitiesPage),
-		h.coreRoute("GET /go-admin/settings", authz.CapabilitySettingsManage, h.settingsPage),
-		h.coreRoute("POST /go-admin/settings", authz.CapabilitySettingsManage, h.settingsSave),
-		h.coreRoute("GET /go-admin/themes", authz.CapabilityThemesManage, h.themesPage),
-		h.coreRoute("POST /go-admin/themes", authz.CapabilityThemesManage, h.themesSave),
-		h.coreRoute("GET /go-admin/permalinks", authz.CapabilitySettingsManage, h.permalinksPage),
-		h.coreRoute("POST /go-admin/permalinks", authz.CapabilitySettingsManage, h.permalinksSave),
-		h.coreRoute("GET /go-admin/headless", authz.CapabilitySettingsManage, h.headlessPage),
-		h.coreRoute("GET /go-admin/runtime", authz.CapabilitySettingsManage, h.runtimePage),
-	)
+	h.registry.AddRoutes(pageRoutes...)
 	h.registry.AddRoutes(contentRoutes...)
 }
 
@@ -226,6 +192,81 @@ func (h Handler) contentResourceRoutes(resource cmspanel.ContentResource) []plug
 		routes = append(routes, h.coreRoute(route.Pattern, route.Capability, handler))
 	}
 	return routes
+}
+
+func (h Handler) adminPageRoutes(page cmspanel.AdminPage) []plugins.Route {
+	routes := make([]plugins.Route, 0, len(page.Routes))
+	for _, route := range page.Routes {
+		handler := h.adminPageHandler(string(page.ID), route.Role)
+		if handler == nil {
+			continue
+		}
+		routes = append(routes, h.coreRoute(route.Pattern, route.Capability, handler))
+	}
+	return routes
+}
+
+func (h Handler) adminPageHandler(pageID string, role cmspanel.AdminRouteRole) func(http.ResponseWriter, *http.Request, authz.Principal) {
+	switch pageID {
+	case "dashboard":
+		if role == cmspanel.AdminRouteIndex {
+			return h.dashboard
+		}
+	case "content-types":
+		if role == cmspanel.AdminRouteCreate {
+			return h.contentTypeCreate
+		}
+		return h.contentTypesPage
+	case "taxonomies":
+		if role == cmspanel.AdminRouteCreate {
+			return h.taxonomyCreate
+		}
+		return h.taxonomiesPage
+	case "terms":
+		if role == cmspanel.AdminRouteCreate {
+			return h.termCreate
+		}
+		return h.termsPage
+	case "media":
+		if role == cmspanel.AdminRouteCreate {
+			return h.mediaSave
+		}
+		return h.mediaPage
+	case "menus":
+		if role == cmspanel.AdminRouteCreate {
+			return h.menuSave
+		}
+		return h.menusPage
+	case "users":
+		if role == cmspanel.AdminRouteCreate {
+			return h.userSave
+		}
+		return h.usersPage
+	case "authors":
+		return h.authorsPage
+	case "capabilities":
+		return h.capabilitiesPage
+	case "settings":
+		if role == cmspanel.AdminRouteUpdate {
+			return h.settingsSave
+		}
+		return h.settingsPage
+	case "themes":
+		if role == cmspanel.AdminRouteUpdate {
+			return h.themesSave
+		}
+		return h.themesPage
+	case "permalinks":
+		if role == cmspanel.AdminRouteUpdate {
+			return h.permalinksSave
+		}
+		return h.permalinksPage
+	case "headless":
+		return h.headlessPage
+	case "runtime":
+		return h.runtimePage
+	}
+	return nil
 }
 
 func (h Handler) Register(mux *http.ServeMux) {

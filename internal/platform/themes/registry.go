@@ -10,6 +10,7 @@ import (
 	"github.com/fastygo/cms/internal/application/publicrender"
 	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	blanktheme "github.com/fastygo/cms/internal/themes/blank"
+	companytheme "github.com/fastygo/cms/internal/themes/company"
 	gocmsdefault "github.com/fastygo/cms/internal/themes/gocmsdefault"
 )
 
@@ -50,7 +51,7 @@ func NewRegistry(items ...Theme) (*Registry, error) {
 }
 
 func DefaultRegistry() *Registry {
-	registry, err := NewRegistry(gocmsdefault.New(), blanktheme.New())
+	registry, err := NewRegistry(gocmsdefault.New(), blanktheme.New(), companytheme.New())
 	if err != nil {
 		panic(err)
 	}

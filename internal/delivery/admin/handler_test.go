@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/fastygo/cms/internal/infra/features/cms"
+	"github.com/fastygo/cms/internal/platform/cmspanel"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 )
 
@@ -211,6 +212,30 @@ func TestAdminScreensRenderSinglePageDescription(t *testing.T) {
 	}
 }
 
+func TestAdminRegistersCoreRoutesFromCMSPanelDescriptors(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	for _, page := range cmspanel.AdminPages() {
+		for _, route := range page.Routes {
+			if !strings.HasPrefix(route.Pattern, "GET ") {
+				continue
+			}
+			t.Run(string(page.ID), func(t *testing.T) {
+				path := strings.TrimPrefix(route.Pattern, "GET ")
+				path = strings.ReplaceAll(path, "{type}", "category")
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, path, nil)
+				req.Header.Set("Authorization", "Bearer admin-token")
+				mux.ServeHTTP(rec, req)
+				if rec.Code != http.StatusOK {
+					t.Fatalf("expected %s to render from cmspanel descriptor, got %d: %s", path, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	}
+}
+
 func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	mux, closeFn := newAdminMux(t)
 	defer closeFn()
@@ -246,6 +271,65 @@ func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	mux.ServeHTTP(save, saveReq)
 	if save.Code != http.StatusSeeOther {
 		t.Fatalf("expected settings redirect, got %d: %s", save.Code, save.Body.String())
+	}
+}
+
+func TestAdminCoreSectionCreateWorkflows(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	cases := []struct {
+		name string
+		path string
+		form url.Values
+	}{
+		{
+			name: "content-types",
+			path: "/go-admin/content-types",
+			form: url.Values{"id": {"case-study"}, "label": {"Case studies"}},
+		},
+		{
+			name: "terms",
+			path: "/go-admin/taxonomies/category/terms",
+			form: url.Values{"id": {"featured"}, "name": {"Featured"}, "slug": {"featured"}},
+		},
+		{
+			name: "media",
+			path: "/go-admin/media",
+			form: url.Values{"id": {"media-admin-test"}, "filename": {"admin-test.jpg"}, "mime_type": {"image/jpeg"}, "public_url": {"/media/admin-test.jpg"}},
+		},
+		{
+			name: "menus",
+			path: "/go-admin/menus",
+			form: url.Values{"id": {"secondary"}, "name": {"Secondary"}, "location": {"secondary"}},
+		},
+		{
+			name: "users",
+			path: "/go-admin/users",
+			form: url.Values{"id": {"editor-2"}, "login": {"editor2"}, "display_name": {"Editor Two"}, "email": {"editor2@example.test"}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer admin-token")
+			mux.ServeHTTP(page, req)
+			if page.Code != http.StatusOK {
+				t.Fatalf("expected %s page, got %d: %s", tc.name, page.Code, page.Body.String())
+			}
+
+			tc.form.Set("action_token", extractToken(t, page.Body.String()))
+			create := httptest.NewRecorder()
+			createReq := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.form.Encode()))
+			createReq.Header.Set("Authorization", "Bearer admin-token")
+			createReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			mux.ServeHTTP(create, createReq)
+			if create.Code != http.StatusSeeOther {
+				t.Fatalf("expected %s redirect, got %d: %s", tc.name, create.Code, create.Body.String())
+			}
+		})
 	}
 }
 
