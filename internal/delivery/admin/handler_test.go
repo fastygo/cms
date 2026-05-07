@@ -168,6 +168,49 @@ func TestAdminContentWorkflowAndCapabilityChecks(t *testing.T) {
 	}
 }
 
+func TestAdminScreensRenderSinglePageDescription(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	cases := []struct {
+		path        string
+		description string
+	}{
+		{path: "/go-admin", description: "Manage GoCMS content, taxonomies, media, users, and headless delivery."},
+		{path: "/go-admin/posts", description: "Create, edit, publish, schedule, trash, and restore content."},
+		{path: "/go-admin/posts/new", description: "Create a draft and choose publish state."},
+		{path: "/go-admin/pages", description: "Create, edit, publish, schedule, trash, and restore content."},
+		{path: "/go-admin/content-types", description: "Manage built-in and custom content types."},
+		{path: "/go-admin/taxonomies", description: "Manage taxonomy definitions and terms."},
+		{path: "/go-admin/taxonomies/category/terms", description: "Manage taxonomy terms."},
+		{path: "/go-admin/media", description: "Manage media metadata and featured media references."},
+		{path: "/go-admin/menus", description: "Manage navigation menus."},
+		{path: "/go-admin/users", description: "Manage users and account state."},
+		{path: "/go-admin/authors", description: "Review public author projections."},
+		{path: "/go-admin/capabilities", description: "Review capability groups enforced server-side."},
+		{path: "/go-admin/settings", description: "Configure public site settings."},
+		{path: "/go-admin/themes", description: "Inspect the active built-in theme contract and available template roles."},
+		{path: "/go-admin/permalinks", description: "Configure public post and page routes."},
+		{path: "/go-admin/headless", description: "Inspect API delivery mode and upcoming plugin state."},
+		{path: "/go-admin/runtime", description: "Inspect the resolved preset, bootstrap provider, active plugins, and provider switch rules."},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer admin-token")
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected %s to render, got %d: %s", tc.path, rec.Code, rec.Body.String())
+			}
+			if count := strings.Count(rec.Body.String(), tc.description); count != 1 {
+				t.Fatalf("expected page description %q once on %s, got %d", tc.description, tc.path, count)
+			}
+		})
+	}
+}
+
 func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	mux, closeFn := newAdminMux(t)
 	defer closeFn()

@@ -45,6 +45,7 @@ templ ContentListPage(data ContentListPageData) {
 		Screen: data.Screen,
 		Title: data.Table.Title,
 		Description: data.Table.Description,
+		Actions: data.Table.Actions,
 		Body: blocks.ContentTable(data.Table),
 	})
 }

@@ -155,6 +155,7 @@ func ContentListPage(data ContentListPageData) templ.Component {
 			Screen:      data.Screen,
 			Title:       data.Table.Title,
 			Description: data.Table.Description,
+			Actions:     data.Table.Actions,
 			Body:        blocks.ContentTable(data.Table),
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

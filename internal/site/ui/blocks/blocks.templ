@@ -66,13 +66,6 @@ templ ContentTable(data ContentTableData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": "content-table"},
 	}) {
-		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
-			@ui.Stack(ui.StackProps{}) {
-				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
-				@elements.FieldHelp(data.Description)
-			}
-			@elements.ActionRow(data.Actions)
-		}
 		@ui.Table(ui.TableProps{Attrs: templpkg.Attributes{"data-gocms-resource": "content"}}) {
 			@ui.TableHead(ui.TableSectionProps{}) {
 				@ui.TableRow(ui.TableRowProps{}) {
@@ -108,13 +101,6 @@ templ ContentEditor(data ContentEditorData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": "content-editor"},
 	}) {
-		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
-			@ui.Stack(ui.StackProps{}) {
-				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
-				@elements.FieldHelp(data.Description)
-			}
-			@elements.StatusBadge(data.Status)
-		}
 		@elements.ValidationSummary(data.Errors)
 		@ui.Form(ui.FormProps{Action: data.Action, Method: "post", Class: "gocms-editor-grid", Attrs: templpkg.Attributes{"data-gocms-action": "save-content"}}) {
 			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
@@ -277,7 +263,6 @@ templ SettingsCard(data ContentEditorData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": "settings-card"},
 	}) {
-		@ui.Title(ui.TitleProps{Order: 2}, data.Title)
 		@elements.ValidationSummary(data.Errors)
 		@ui.Form(ui.FormProps{Action: data.Action, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": "save-settings"}}) {
 			@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
@@ -295,13 +280,6 @@ templ SimpleList(data SimpleListData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": data.Marker},
 	}) {
-		@ui.Group(ui.GroupProps{Class: "gocms-admin-header"}) {
-			@ui.Stack(ui.StackProps{}) {
-				@ui.Title(ui.TitleProps{Order: 2}, data.Title)
-				@elements.FieldHelp(data.Description)
-			}
-			@elements.ActionRow(data.Actions)
-		}
 		if data.FormAction != "" && len(data.Fields) > 0 {
 			@ui.Form(ui.FormProps{Action: data.FormAction, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": data.Marker + "-save"}}) {
 				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
