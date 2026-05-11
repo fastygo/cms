@@ -3,18 +3,22 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	appaudit "github.com/fastygo/cms/internal/application/audit"
 	appcontent "github.com/fastygo/cms/internal/application/content"
 	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
 	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmenus "github.com/fastygo/cms/internal/application/menus"
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	appsettings "github.com/fastygo/cms/internal/application/settings"
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
+	domainaudit "github.com/fastygo/cms/internal/domain/audit"
 	domainauthz "github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
@@ -22,6 +26,7 @@ import (
 	domainmenus "github.com/fastygo/cms/internal/domain/menus"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/framework/pkg/web"
 )
 
@@ -33,15 +38,26 @@ type Services struct {
 	Users        appusers.Service
 	Settings     appsettings.Service
 	Menus        appmenus.Service
+	Audit        appaudit.Service
 }
 
 type Handler struct {
 	services Services
 	auth     Authenticator
+	registry *platformplugins.Registry
+	meta     *appmeta.Registry
 }
 
 func NewHandler(services Services, auth Authenticator) Handler {
-	return Handler{services: services, auth: auth}
+	return NewHandlerWithOptions(services, auth, nil, nil)
+}
+
+func NewHandlerWithRegistry(services Services, auth Authenticator, registry *platformplugins.Registry) Handler {
+	return NewHandlerWithOptions(services, auth, registry, nil)
+}
+
+func NewHandlerWithOptions(services Services, auth Authenticator, registry *platformplugins.Registry, metaRegistry *appmeta.Registry) Handler {
+	return Handler{services: services, auth: auth, registry: registry, meta: metaRegistry}
 }
 
 func (h Handler) Register(mux *http.ServeMux) {
@@ -84,7 +100,7 @@ func (h Handler) rootDiscovery(w http.ResponseWriter, _ *http.Request) {
 		Name:           "GoCMS",
 		Version:        "2",
 		Routes:         map[string]any{"go/v2": "/go-json/go/v2/"},
-		Authentication: []string{"browser_session", "dev_bearer"},
+		Authentication: []string{"browser_session", "app_token", "dev_bearer"},
 		Links:          map[string]any{"self": "/go-json"},
 	})
 }
@@ -104,7 +120,7 @@ func (h Handler) namespaceDiscovery(w http.ResponseWriter, _ *http.Request) {
 		Name:           "GoCMS",
 		Version:        "2",
 		Routes:         routes,
-		Authentication: []string{"browser_session", "dev_bearer"},
+		Authentication: []string{"browser_session", "app_token", "dev_bearer"},
 		Links:          map[string]any{"self": "/go-json/go/v2/"},
 	})
 }
@@ -125,7 +141,12 @@ func (h Handler) listContent(kind domaincontent.Kind) http.HandlerFunc {
 		}
 		data := make([]ContentDTO, 0, len(result.Items))
 		for _, entry := range result.Items {
-			data = append(data, ContentProjection(entry, includePrivate))
+			projected, err := h.projectContent(r, principal, authenticated, entry, includePrivate)
+			if err != nil {
+				WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+				return
+			}
+			data = append(data, projected)
 		}
 		_ = web.WriteJSON(w, http.StatusOK, ListEnvelope{
 			Data:       data,
@@ -141,7 +162,12 @@ func (h Handler) getContentByID(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusNotFound, "not_found", err.Error(), nil)
 		return
 	}
-	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: ContentProjection(entry, authenticated && principal.Has(domainauthz.CapabilityContentReadPrivate))})
+	projected, err := h.projectContent(r, principal, authenticated, entry, authenticated && principal.Has(domainauthz.CapabilityContentReadPrivate))
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		return
+	}
+	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: projected})
 }
 
 func (h Handler) getContentBySlug(kind domaincontent.Kind) http.HandlerFunc {
@@ -152,7 +178,12 @@ func (h Handler) getContentBySlug(kind domaincontent.Kind) http.HandlerFunc {
 			WriteError(w, http.StatusNotFound, "not_found", err.Error(), nil)
 			return
 		}
-		_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: ContentProjection(entry, authenticated && principal.Has(domainauthz.CapabilityContentReadPrivate))})
+		projected, err := h.projectContent(r, principal, authenticated, entry, authenticated && principal.Has(domainauthz.CapabilityContentReadPrivate))
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+		_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: projected})
 	}
 }
 
@@ -185,7 +216,13 @@ func (h Handler) createContent(kind domaincontent.Kind) http.HandlerFunc {
 			WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 			return
 		}
-		_ = web.WriteJSON(w, http.StatusCreated, ResourceEnvelope{Data: ContentProjection(entry, true)})
+		projected, err := h.projectContent(r, principal, true, entry, true)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+		h.audit(r, principal, "api.content.create", "content", string(entry.ID), domainaudit.StatusSuccess, map[string]any{"kind": entry.Kind, "status": entry.Status})
+		_ = web.WriteJSON(w, http.StatusCreated, ResourceEnvelope{Data: projected})
 	}
 }
 
@@ -217,7 +254,13 @@ func (h Handler) updateContent(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
-	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: ContentProjection(entry, true)})
+	projected, err := h.projectContent(r, principal, true, entry, true)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		return
+	}
+	h.audit(r, principal, "api.content.update", "content", string(entry.ID), domainaudit.StatusSuccess, map[string]any{"kind": entry.Kind, "status": entry.Status})
+	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: projected})
 }
 
 func (h Handler) trashContent(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +273,13 @@ func (h Handler) trashContent(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
-	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: ContentProjection(entry, true)})
+	projected, err := h.projectContent(r, principal, true, entry, true)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		return
+	}
+	h.audit(r, principal, "api.content.trash", "content", string(entry.ID), domainaudit.StatusSuccess, map[string]any{"kind": entry.Kind})
+	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: projected})
 }
 
 func (h Handler) applyRequestedStatus(r *http.Request, principal domainauthz.Principal, id domaincontent.ID, request contentWriteRequest) (domaincontent.Entry, error) {
@@ -292,6 +341,7 @@ func (h Handler) registerContentType(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
 		return
 	}
+	h.audit(r, principal, "api.content_type.register", "content_type", string(contentType.ID), domainaudit.StatusSuccess, nil)
 	_ = web.WriteJSON(w, http.StatusCreated, ResourceEnvelope{Data: ContentTypeProjection(contentType)})
 }
 
@@ -331,6 +381,7 @@ func (h Handler) registerTaxonomy(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
+	h.audit(r, principal, "api.taxonomy.register", "taxonomy", string(definition.Type), domainaudit.StatusSuccess, nil)
 	_ = web.WriteJSON(w, http.StatusCreated, ResourceEnvelope{Data: TaxonomyProjection(definition)})
 }
 
@@ -382,6 +433,7 @@ func (h Handler) createTerm(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
+	h.audit(r, principal, "api.term.create", "term", string(term.ID), domainaudit.StatusSuccess, map[string]any{"taxonomy": term.Type})
 	_ = web.WriteJSON(w, http.StatusCreated, ResourceEnvelope{Data: TermProjection(term)})
 }
 
@@ -400,7 +452,13 @@ func (h Handler) assignTerms(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
-	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: ContentProjection(entry, true)})
+	projected, err := h.projectContent(r, principal, true, entry, true)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		return
+	}
+	h.audit(r, principal, "api.terms.assign", "content", string(entry.ID), domainaudit.StatusSuccess, map[string]any{"terms": len(request.Terms)})
+	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: projected})
 }
 
 func (h Handler) listMedia(w http.ResponseWriter, r *http.Request) {
@@ -446,6 +504,7 @@ func (h Handler) saveMedia(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, statusFromError(err), errorCodeFromStatus(statusFromError(err)), err.Error(), nil)
 		return
 	}
+	h.audit(r, principal, "api.media.save", "media", string(asset.ID), domainaudit.StatusSuccess, map[string]any{"mime_type": asset.MimeType})
 	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: MediaProjection(asset)})
 }
 
@@ -531,7 +590,12 @@ func (h Handler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]ContentDTO, 0, len(result.Items))
 	for _, entry := range result.Items {
-		data = append(data, ContentProjection(entry, false))
+		projected, err := h.projectContent(r, domainauthz.Principal{}, false, entry, false)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+		data = append(data, projected)
 	}
 	_ = web.WriteJSON(w, http.StatusOK, ListEnvelope{
 		Data:       data,
@@ -548,16 +612,55 @@ func (h Handler) requirePrincipal(w http.ResponseWriter, r *http.Request) (domai
 	return principal, true
 }
 
+func (h Handler) audit(r *http.Request, principal domainauthz.Principal, action string, resource string, resourceID string, status domainaudit.Status, details map[string]any) {
+	if !h.services.Audit.Enabled() {
+		return
+	}
+	_ = h.services.Audit.Record(r.Context(), domainaudit.Event{
+		ActorID:    principal.ID,
+		Action:     action,
+		Resource:   resource,
+		ResourceID: resourceID,
+		Status:     status,
+		RemoteAddr: r.RemoteAddr,
+		UserAgent:  r.UserAgent(),
+		Details:    details,
+	})
+}
+
+func (h Handler) projectContent(r *http.Request, principal domainauthz.Principal, authenticated bool, entry domaincontent.Entry, includePrivate bool) (ContentDTO, error) {
+	return projectContent(r.Context(), h.registry, h.meta, entry, includePrivate, platformplugins.HookContext{
+		Surface:       platformplugins.SurfaceREST,
+		Path:          r.URL.Path,
+		Locale:        r.URL.Query().Get("locale"),
+		Principal:     principal,
+		Authenticated: authenticated,
+		Metadata: map[string]any{
+			"resource":        "content",
+			"include_private": includePrivate,
+			"content_id":      string(entry.ID),
+		},
+	})
+}
+
 func parseContentQuery(r *http.Request, kind domaincontent.Kind, publicOnly bool) (domaincontent.Query, error) {
 	values := r.URL.Query()
+	page, err := parsePositiveInt(values.Get("page"), 1, "page")
+	if err != nil {
+		return domaincontent.Query{}, err
+	}
+	perPage, err := parsePositiveInt(values.Get("per_page"), 20, "per_page")
+	if err != nil {
+		return domaincontent.Query{}, err
+	}
 	query := domaincontent.Query{
 		PublicOnly: publicOnly,
 		Locale:     values.Get("locale"),
 		Slug:       values.Get("slug"),
 		AuthorID:   values.Get("author"),
 		Search:     values.Get("search"),
-		Page:       parsePositiveInt(values.Get("page"), 1),
-		PerPage:    parsePositiveInt(values.Get("per_page"), 20),
+		Page:       page,
+		PerPage:    perPage,
 		SortBy:     domaincontent.SortField(values.Get("sort")),
 		SortDesc:   strings.ToLower(values.Get("order")) == "desc",
 	}
@@ -612,12 +715,15 @@ func parseTime(value string) (time.Time, error) {
 	return time.Parse("2006-01-02", value)
 }
 
-func parsePositiveInt(value string, fallback int) int {
+func parsePositiveInt(value string, fallback int, field string) (int, error) {
+	if strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return 0, fmt.Errorf("%s must be a positive integer", field)
 	}
-	return parsed
+	return parsed, nil
 }
 
 func metadataFromRequest(values map[string]any, public bool) domaincontent.Metadata {

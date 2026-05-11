@@ -1,5 +1,7 @@
 package authz
 
+import "slices"
+
 // Capability identifies one granular permission.
 type Capability string
 
@@ -80,4 +82,84 @@ type Role struct {
 	ID           string
 	Label        string
 	Capabilities []Capability
+}
+
+const (
+	RoleAdmin  = "admin"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+func BuiltInRoles() []Role {
+	return []Role{
+		{
+			ID:    RoleAdmin,
+			Label: "Administrator",
+			Capabilities: []Capability{
+				CapabilityControlPanelAccess,
+				CapabilityContentCreate,
+				CapabilityContentReadPrivate,
+				CapabilityContentEdit,
+				CapabilityContentEditOwn,
+				CapabilityContentEditOthers,
+				CapabilityContentPublish,
+				CapabilityContentSchedule,
+				CapabilityContentDelete,
+				CapabilityContentRestore,
+				CapabilityMediaUpload,
+				CapabilityMediaEdit,
+				CapabilityTaxonomiesManage,
+				CapabilityTaxonomiesAssign,
+				CapabilityMenusManage,
+				CapabilitySettingsManage,
+				CapabilityUsersManage,
+				CapabilityRolesManage,
+				CapabilityPluginsManage,
+				CapabilityThemesManage,
+				CapabilityPrivateAPIRead,
+			},
+		},
+		{
+			ID:    RoleEditor,
+			Label: "Editor",
+			Capabilities: []Capability{
+				CapabilityControlPanelAccess,
+				CapabilityContentCreate,
+				CapabilityContentReadPrivate,
+				CapabilityContentEditOwn,
+				CapabilityContentPublish,
+				CapabilityContentSchedule,
+				CapabilityContentDelete,
+				CapabilityContentRestore,
+				CapabilityMediaUpload,
+				CapabilityMediaEdit,
+				CapabilityTaxonomiesAssign,
+				CapabilityPrivateAPIRead,
+			},
+		},
+		{
+			ID:    RoleViewer,
+			Label: "Viewer",
+			Capabilities: []Capability{
+				CapabilityControlPanelAccess,
+				CapabilityContentReadPrivate,
+			},
+		},
+	}
+}
+
+func ResolveRoleCapabilities(roleIDs []string) []Capability {
+	resolved := []Capability{}
+	known := map[string][]Capability{}
+	for _, role := range BuiltInRoles() {
+		known[role.ID] = role.Capabilities
+	}
+	for _, roleID := range roleIDs {
+		for _, capability := range known[roleID] {
+			if !slices.Contains(resolved, capability) {
+				resolved = append(resolved, capability)
+			}
+		}
+	}
+	return resolved
 }

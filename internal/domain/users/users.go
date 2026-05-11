@@ -1,5 +1,7 @@
 package users
 
+import "time"
+
 type ID string
 type Status string
 
@@ -10,13 +12,17 @@ const (
 )
 
 type User struct {
-	ID          ID
-	Login       string
-	DisplayName string
-	Email       string
-	Status      Status
-	Roles       []string
-	Profile     AuthorProfile
+	ID                 ID
+	Login              string
+	DisplayName        string
+	Email              string
+	Status             Status
+	Roles              []string
+	Profile            AuthorProfile
+	PasswordHash       string
+	PasswordUpdatedAt  *time.Time
+	MustChangePassword bool
+	LastLoginAt        *time.Time
 }
 
 type AuthorProfile struct {

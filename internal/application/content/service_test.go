@@ -3,14 +3,18 @@ package content_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
 	appcontent "github.com/fastygo/cms/internal/application/content"
 	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	"github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
+	domainmeta "github.com/fastygo/cms/internal/domain/meta"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 )
 
 func TestContentWorkflows(t *testing.T) {
@@ -142,6 +146,99 @@ func TestContentRequiresCapabilitiesAndRegisteredTypes(t *testing.T) {
 	_, err = service.CreateDraft(ctx, creator, appcontent.CreateDraftCommand{Kind: domaincontent.KindPost})
 	if err == nil {
 		t.Fatal("expected unregistered content type to be rejected")
+	}
+}
+
+func TestContentNormalizesRegisteredMetadataAndDispatchesHooks(t *testing.T) {
+	ctx := context.Background()
+	contentRepo := newMemoryContentRepo()
+	typeRepo := newMemoryTypeRepo()
+	typeService := appcontenttype.NewService(typeRepo)
+	if err := typeService.InstallBuiltIns(ctx); err != nil {
+		t.Fatal(err)
+	}
+	metaRegistry, err := appmeta.NewRegistry(
+		domainmeta.Definition{
+			Key:      "seo_title",
+			Label:    "SEO title",
+			Owner:    "test",
+			Scope:    domainmeta.ScopeContent,
+			Kinds:    []domaincontent.Kind{domaincontent.KindPost},
+			Type:     domainmeta.ValueTypeString,
+			Public:   true,
+			Required: true,
+		},
+		domainmeta.Definition{
+			Key:    "secret_token",
+			Label:  "Secret token",
+			Owner:  "test",
+			Scope:  domainmeta.ScopeContent,
+			Kinds:  []domaincontent.Kind{domaincontent.KindPost},
+			Type:   domainmeta.ValueTypeString,
+			Public: false,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginRegistry := platformplugins.NewRegistry()
+	var events []string
+	for _, hookID := range []string{
+		"content.metadata.validate.before",
+		"content.metadata.validate.after",
+		"content.metadata.persist.before",
+		"content.metadata.persist.after",
+	} {
+		hookID := hookID
+		pluginRegistry.AddActionHandlers(platformplugins.ActionHandlerRegistration{
+			Hook: platformplugins.HookRegistration{
+				HookID:    hookID,
+				HandlerID: hookID,
+				OwnerID:   "test",
+				Category:  platformplugins.HookCategoryAction,
+			},
+			Handle: func(_ context.Context, _ platformplugins.HookContext, value any) error {
+				payload := value.(appcontent.MetadataHookPayload)
+				events = append(events, hookID+":"+payload.Operation)
+				return nil
+			},
+		})
+	}
+	service := appcontent.NewService(
+		contentRepo,
+		typeRepo,
+		time.Now,
+		appcontent.WithMetadataRegistry(metaRegistry),
+		appcontent.WithHookRegistry(func() *platformplugins.Registry { return pluginRegistry }),
+	)
+	editor := authz.NewPrincipal("author-1", authz.CapabilityContentCreate, authz.CapabilityContentEditOwn)
+
+	post, err := service.CreateDraft(ctx, editor, appcontent.CreateDraftCommand{
+		Kind:  domaincontent.KindPost,
+		Title: domaincontent.LocalizedText{"en": "Hello"},
+		Slug:  domaincontent.LocalizedText{"en": "hello"},
+		Metadata: domaincontent.Metadata{
+			"seo_title":    {Value: "  Search Title  ", Public: false},
+			"secret_token": {Value: "top-secret", Public: true},
+			"custom_hint":  {Value: "keep-me", Public: true},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := post.Metadata["seo_title"]; got.Value != "Search Title" || !got.Public {
+		t.Fatalf("seo_title = %+v", got)
+	}
+	if got := post.Metadata["secret_token"]; got.Value != "top-secret" || got.Public {
+		t.Fatalf("secret_token = %+v", got)
+	}
+	if !slices.Equal(events, []string{
+		"content.metadata.validate.before:create",
+		"content.metadata.validate.after:create",
+		"content.metadata.persist.before:create",
+		"content.metadata.persist.after:create",
+	}) {
+		t.Fatalf("events = %v", events)
 	}
 }
 

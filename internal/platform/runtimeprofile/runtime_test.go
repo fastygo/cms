@@ -32,3 +32,17 @@ func TestStorageProfileValidation(t *testing.T) {
 	}
 }
 
+func TestDeploymentProfileValidation(t *testing.T) {
+	if err := ValidateDeploymentProfile(string(DeploymentProfileServerless)); err != nil {
+		t.Fatalf("valid deployment profile should pass: %v", err)
+	}
+	if err := ValidateDeploymentProfile("bad"); err == nil {
+		t.Fatalf("invalid deployment profile should fail")
+	}
+	if !IsDeploymentProfile(string(DeploymentProfileBrowser)) {
+		t.Fatalf("expected browser to be recognized")
+	}
+	if IsDeploymentProfile("bad") {
+		t.Fatalf("expected bad deployment profile to be rejected")
+	}
+}

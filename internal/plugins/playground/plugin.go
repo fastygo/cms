@@ -34,6 +34,10 @@ func (Plugin) Register(_ context.Context, registry *plugins.Registry) error {
 	manifest := Plugin{}.Manifest()
 	registry.AddAssets(manifest.Assets...)
 	registry.AddHooks(manifest.Hooks...)
+	registry.AddActionHandlers(plugins.ActionHandlerRegistration{
+		Hook:   manifest.Hooks[0],
+		Handle: func(context.Context, plugins.HookContext, any) error { return nil },
+	})
 	registry.AddScreenActions(
 		plugins.ScreenActionRegistration{ScreenID: "settings", Build: playgroundActions},
 		plugins.ScreenActionRegistration{ScreenID: "headless", Build: playgroundActions},

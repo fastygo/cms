@@ -42,19 +42,20 @@ func main() {
 
 func buildApp(cfg platformconfig.Config, logger *slog.Logger) (*app.App, error) {
 	cmsModule, err := cms.NewWithOptions(cms.Options{
-		DataSource:       cfg.Framework.DataSource,
-		SessionKey:       cfg.Framework.SessionKey,
-		SeedFixtures:     cfg.SeedFixtures,
-		RuntimeProfile:   cfg.RuntimeProfile,
-		StorageProfile:   cfg.StorageProfile,
-		ActivePlugins:    cfg.ActivePlugins,
-		SitePackageDir:   cfg.SitePackageDir,
-		PlaygroundAuth:   cfg.PlaygroundAuth,
-		BrowserStateless: cfg.BrowserStateless,
-		EnableDevBearer:  cfg.EnableDevBearer,
-		LoginPolicy:      cfg.LoginPolicy,
-		AdminPolicy:      cfg.AdminPolicy,
-		Preset:           cfg.Preset,
+		DataSource:        cfg.Framework.DataSource,
+		SessionKey:        cfg.Framework.SessionKey,
+		SeedFixtures:      cfg.SeedFixtures,
+		RuntimeProfile:    cfg.RuntimeProfile,
+		StorageProfile:    cfg.StorageProfile,
+		DeploymentProfile: cfg.DeploymentProfile,
+		ActivePlugins:     cfg.ActivePlugins,
+		SitePackageDir:    cfg.SitePackageDir,
+		PlaygroundAuth:    cfg.PlaygroundAuth,
+		BrowserStateless:  cfg.BrowserStateless,
+		EnableDevBearer:   cfg.EnableDevBearer,
+		LoginPolicy:       cfg.LoginPolicy,
+		AdminPolicy:       cfg.AdminPolicy,
+		Preset:            cfg.Preset,
 	})
 	if err != nil {
 		return nil, err

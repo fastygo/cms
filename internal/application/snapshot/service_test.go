@@ -22,7 +22,7 @@ func TestExportAndImportRoundTrip(t *testing.T) {
 	if err := fixtures.Seed(ctx, source); err != nil {
 		t.Fatalf("Seed(source) error = %v", err)
 	}
-	service := NewService(source, func() time.Time { return time.Unix(10, 0).UTC() })
+	service := NewService(source, func() time.Time { return time.Unix(10, 0).UTC() }).WithProviderProfile("sqlite")
 	bundle, err := service.Export(ctx)
 	if err != nil {
 		t.Fatalf("Export() error = %v", err)
@@ -32,6 +32,12 @@ func TestExportAndImportRoundTrip(t *testing.T) {
 	}
 	if len(bundle.Content) == 0 || len(bundle.ContentTypes) == 0 || len(bundle.Settings) == 0 {
 		t.Fatalf("expected exported bundle to contain seeded data")
+	}
+	if bundle.Backup.ProviderProfile != "sqlite" || bundle.Backup.ValidationResult != "ok" {
+		t.Fatalf("unexpected backup metadata: %+v", bundle.Backup)
+	}
+	if got := bundle.Backup.ItemCounts["users"]; got == 0 {
+		t.Fatalf("expected backup metadata to include user counts, got %d", got)
 	}
 
 	target, err := sqlitestore.Open("file:snapshot-target?mode=memory&cache=shared")

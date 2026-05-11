@@ -2,6 +2,7 @@ package cms
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	frameworkapp "github.com/fastygo/framework/pkg/app"
 )
@@ -169,6 +171,56 @@ func TestPublicContentBodyRendersHTMLInsideProse(t *testing.T) {
 	}
 }
 
+func TestPublicRenderFilterAppliesAtSafeOutputBoundary(t *testing.T) {
+	descriptor := moduleTestDescriptor{
+		manifest: platformplugins.Manifest{
+			ID:          "render-filter",
+			Name:        "Render Filter",
+			Version:     "1.0.0",
+			Contract:    "0.1",
+			Description: "Adds a public render marker.",
+			Hooks: []platformplugins.HookRegistration{
+				{HookID: "render.content.filter", HandlerID: "render-filter.public", OwnerID: "render-filter", Category: platformplugins.HookCategoryFilter},
+			},
+		},
+		register: func(_ context.Context, registry *platformplugins.Registry) error {
+			manifest := platformplugins.Manifest{
+				Hooks: []platformplugins.HookRegistration{
+					{HookID: "render.content.filter", HandlerID: "render-filter.public", OwnerID: "render-filter", Category: platformplugins.HookCategoryFilter},
+				},
+			}
+			registry.AddHooks(manifest.Hooks...)
+			registry.AddFilterHandlers(platformplugins.FilterHandlerRegistration{
+				Hook: manifest.Hooks[0],
+				Handle: func(_ context.Context, _ platformplugins.HookContext, value any) (any, error) {
+					return `<div data-render-filter="enabled"></div>` + value.(string), nil
+				},
+			})
+			return nil
+		},
+	}
+
+	module := newModuleForPublicTestsWithDescriptors(t, "full", []string{"render-filter"}, []platformplugins.Descriptor{descriptor})
+	t.Cleanup(func() {
+		_ = module.Close(t.Context())
+	})
+
+	mux := http.NewServeMux()
+	module.Routes(mux)
+	post := requestPublic(mux, http.MethodGet, "/published-post/", "", "")
+	if post.Code != http.StatusOK {
+		t.Fatalf("post response = %d body = %s", post.Code, post.Body.String())
+	}
+	if !strings.Contains(post.Body.String(), `data-render-filter="enabled"`) {
+		t.Fatalf("filtered post body = %s", post.Body.String())
+	}
+	for _, unexpected := range []string{"Draft Post", "Scheduled Post"} {
+		if strings.Contains(post.Body.String(), unexpected) {
+			t.Fatalf("unexpected private content leak %q", unexpected)
+		}
+	}
+}
+
 func TestPublicArchivesExposePaginationWithoutPrivateLeaks(t *testing.T) {
 	module := newModuleForPublicTests(t, "full", nil)
 	t.Cleanup(func() {
@@ -266,22 +318,44 @@ func newPublicMux(t *testing.T, runtimeProfile string, activePlugins []string) (
 
 func newModuleForPublicTests(t *testing.T, runtimeProfile string, activePlugins []string) *Module {
 	t.Helper()
+	return newModuleForPublicTestsWithDescriptors(t, runtimeProfile, activePlugins, nil)
+}
+
+func newModuleForPublicTestsWithDescriptors(t *testing.T, runtimeProfile string, activePlugins []string, descriptors []platformplugins.Descriptor) *Module {
+	t.Helper()
 	module, err := NewWithOptions(Options{
-		DataSource:      "file:" + sanitizeName(t.Name()) + "?mode=memory&cache=shared",
-		SessionKey:      "public-test-session-secret-public-test",
-		SeedFixtures:    true,
-		RuntimeProfile:  runtimeProfile,
-		StorageProfile:  "sqlite",
-		ActivePlugins:   activePlugins,
-		EnableDevBearer: true,
-		LoginPolicy:     "fixture",
-		AdminPolicy:     "enabled",
-		Preset:          runtimeProfile,
+		DataSource:       "file:" + sanitizeName(t.Name()) + "?mode=memory&cache=shared",
+		SessionKey:       "public-test-session-secret-public-test",
+		SeedFixtures:     true,
+		RuntimeProfile:   runtimeProfile,
+		StorageProfile:   "sqlite",
+		ActivePlugins:    activePlugins,
+		EnableDevBearer:  true,
+		LoginPolicy:      "fixture",
+		AdminPolicy:      "enabled",
+		Preset:           runtimeProfile,
+		ExtraDescriptors: descriptors,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return module
+}
+
+type moduleTestDescriptor struct {
+	manifest platformplugins.Manifest
+	register func(context.Context, *platformplugins.Registry) error
+}
+
+func (d moduleTestDescriptor) Manifest() platformplugins.Manifest {
+	return d.manifest
+}
+
+func (d moduleTestDescriptor) Register(ctx context.Context, registry *platformplugins.Registry) error {
+	if d.register == nil {
+		return nil
+	}
+	return d.register(ctx, registry)
 }
 
 func requestPublic(handler http.Handler, method string, path string, body string, authorization string) *httptest.ResponseRecorder {
@@ -308,17 +382,17 @@ func seedAdditionalPublishedPosts(t *testing.T, module *Module, count int) {
 	for i := 1; i <= count; i++ {
 		publishedAt := now.Add(time.Duration(i) * time.Hour)
 		entry := domaincontent.Entry{
-			ID:         domaincontent.ID("content-post-extra-" + twoDigits(i)),
-			Kind:       domaincontent.KindPost,
-			Status:     domaincontent.StatusPublished,
-			Visibility: domaincontent.VisibilityPublic,
-			Title:      domaincontent.LocalizedText{"en": "Extra Published " + twoDigits(i)},
-			Slug:       domaincontent.LocalizedText{"en": "extra-published-" + twoDigits(i)},
-			Body:       domaincontent.LocalizedText{"en": "Extra body " + twoDigits(i)},
-			Excerpt:    domaincontent.LocalizedText{"en": "Extra excerpt " + twoDigits(i)},
-			AuthorID:   "author-1",
-			CreatedAt:  publishedAt.Add(-time.Hour),
-			UpdatedAt:  publishedAt,
+			ID:          domaincontent.ID("content-post-extra-" + twoDigits(i)),
+			Kind:        domaincontent.KindPost,
+			Status:      domaincontent.StatusPublished,
+			Visibility:  domaincontent.VisibilityPublic,
+			Title:       domaincontent.LocalizedText{"en": "Extra Published " + twoDigits(i)},
+			Slug:        domaincontent.LocalizedText{"en": "extra-published-" + twoDigits(i)},
+			Body:        domaincontent.LocalizedText{"en": "Extra body " + twoDigits(i)},
+			Excerpt:     domaincontent.LocalizedText{"en": "Extra excerpt " + twoDigits(i)},
+			AuthorID:    "author-1",
+			CreatedAt:   publishedAt.Add(-time.Hour),
+			UpdatedAt:   publishedAt,
 			PublishedAt: &publishedAt,
 		}
 		if err := module.store.Save(t.Context(), entry); err != nil {

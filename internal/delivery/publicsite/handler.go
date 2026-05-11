@@ -14,8 +14,10 @@ import (
 	appusers "github.com/fastygo/cms/internal/application/users"
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	"github.com/fastygo/cms/internal/platform/permalinks"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	"github.com/fastygo/framework/pkg/web"
+	"github.com/fastygo/framework/pkg/web/locale"
 )
 
 type Services struct {
@@ -31,9 +33,14 @@ type Handler struct {
 	services  Services
 	themes    *platformthemes.Registry
 	assembler pageAssembler
+	registry  *platformplugins.Registry
 }
 
 func New(services Services, themes *platformthemes.Registry) Handler {
+	return NewWithRegistry(services, themes, nil)
+}
+
+func NewWithRegistry(services Services, themes *platformthemes.Registry, registry *platformplugins.Registry) Handler {
 	if themes == nil {
 		themes = platformthemes.DefaultRegistry()
 	}
@@ -41,6 +48,7 @@ func New(services Services, themes *platformthemes.Registry) Handler {
 		services:  services,
 		themes:    themes,
 		assembler: newPageAssembler(services, themes),
+		registry:  registry,
 	}
 }
 
@@ -129,6 +137,22 @@ func (h Handler) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) renderPage(w http.ResponseWriter, r *http.Request, request publicrender.RenderRequest, status int) {
+	if request.Page.Content != "" {
+		filtered, err := platformplugins.FilterValue(r.Context(), h.registry, "render.content.filter", platformplugins.HookContext{
+			Surface: pluginsSurfacePublic(),
+			Path:    r.URL.Path,
+			Locale:  locale.From(r.Context()),
+			Metadata: map[string]any{
+				"screen": string(request.Page.Screen),
+				"kind":   string(request.Page.Kind),
+			},
+		}, request.Page.Content)
+		if err != nil {
+			http.Error(w, "Unable to render public page.", http.StatusInternalServerError)
+			return
+		}
+		request.Page.Content = filtered
+	}
 	component, err := h.themes.ResolveActive(string(request.Context.ThemeID)).Render(r.Context(), request)
 	if err != nil {
 		http.Error(w, "Unable to render public page.", http.StatusInternalServerError)
@@ -214,4 +238,8 @@ func isResolvableMiss(err error) bool {
 	}
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "not found") || strings.Contains(message, "not public")
+}
+
+func pluginsSurfacePublic() platformplugins.Surface {
+	return platformplugins.SurfacePublic
 }

@@ -66,33 +66,88 @@ templ ContentTable(data ContentTableData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": "content-table"},
 	}) {
-		@ui.Table(ui.TableProps{Attrs: templpkg.Attributes{"data-gocms-resource": "content"}}) {
-			@ui.TableHead(ui.TableSectionProps{}) {
-				@ui.TableRow(ui.TableRowProps{}) {
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Title, "Title") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Slug, "Slug") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Author, "Author") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
+		if data.Toolbar != nil {
+			@InlineForm(*data.Toolbar, "gocms-list-toolbar", "content-toolbar")
+		}
+		if data.ScreenOpts != nil {
+			@InlineForm(*data.ScreenOpts, "gocms-list-screen-options", "content-screen-options")
+		}
+		if data.QuickEdit != nil {
+			@InlineForm(*data.QuickEdit, "gocms-list-quick-edit", "content-quick-edit")
+		}
+		if data.Bulk != nil {
+			@ui.Form(ui.FormProps{Action: data.Bulk.Action, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": "content-bulk"}}) {
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Bulk.Token})
+				for _, field := range data.Bulk.Fields {
+					@ui.Field(toFieldProps(field))
 				}
+				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.Bulk.SubmitLabel, "Apply"))
+				@ContentTableMarkup(data, true)
 			}
-			@ui.TableBody(ui.TableSectionProps{}) {
-				for _, row := range data.Rows {
-					@ui.TableRow(ui.TableRowProps{}) {
+		} else {
+			@ContentTableMarkup(data, false)
+		}
+		@elements.PaginationControl(data.Pagination)
+	}
+}
+
+templ ContentTableMarkup(data ContentTableData, selectable bool) {
+	@ui.Table(ui.TableProps{Attrs: templpkg.Attributes{"data-gocms-resource": "content"}}) {
+		@ui.TableHead(ui.TableSectionProps{}) {
+			@ui.TableRow(ui.TableRowProps{}) {
+				if selectable {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Selection }
+				}
+				if contentColumnVisible(data.Visible, "title") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Title, "Title") } }
+				}
+				if contentColumnVisible(data.Visible, "slug") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Slug, "Slug") } }
+				}
+				if contentColumnVisible(data.Visible, "status") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
+				}
+				if contentColumnVisible(data.Visible, "author") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Author, "Author") } }
+				}
+				@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
+			}
+		}
+		@ui.TableBody(ui.TableSectionProps{}) {
+			for _, row := range data.Rows {
+				@ui.TableRow(ui.TableRowProps{}) {
+					if selectable {
+						@ui.TableCell(ui.TableCellProps{}) {
+							@ui.Field(ui.FieldProps{ID: "select-content-" + row.ID, Name: "selected_id", Type: "checkbox", Value: row.ID})
+						}
+					}
+					if contentColumnVisible(data.Visible, "title") {
 						@ui.TableCell(ui.TableCellProps{}) { { row.Title } }
+					}
+					if contentColumnVisible(data.Visible, "slug") {
 						@ui.TableCell(ui.TableCellProps{}) { { row.Slug } }
+					}
+					if contentColumnVisible(data.Visible, "status") {
 						@ui.TableCell(ui.TableCellProps{}) {
 							@elements.StatusBadge(row.Status)
 						}
+					}
+					if contentColumnVisible(data.Visible, "author") {
 						@ui.TableCell(ui.TableCellProps{}) { { row.Author } }
-						@ui.TableCell(ui.TableCellProps{}) {
-							@ui.Button(ui.ButtonProps{Href: row.EditURL, Variant: "outline"}, fallbackLabel(data.EditLabel, "Edit"))
+					}
+					@ui.TableCell(ui.TableCellProps{}) {
+						@ui.Group(ui.GroupProps{}) {
+							if row.EditURL != "" {
+								@ui.Button(ui.ButtonProps{Href: row.EditURL, Variant: "outline"}, fallbackLabel(data.EditLabel, "Edit"))
+							}
+							if row.QuickEditURL != "" {
+								@ui.Button(ui.ButtonProps{Href: row.QuickEditURL, Variant: "outline"}, fallbackLabel(data.QuickLabel, "Quick edit"))
+							}
 						}
 					}
 				}
 			}
 		}
-		@elements.PaginationControl(data.Pagination)
 	}
 }
 
@@ -280,6 +335,15 @@ templ SimpleList(data SimpleListData) {
 		Class: "gocms-admin-screen",
 		Attrs: templpkg.Attributes{"data-gocms-block": data.Marker},
 	}) {
+		if data.Toolbar != nil {
+			@InlineForm(*data.Toolbar, "gocms-list-toolbar", data.Marker+"-toolbar")
+		}
+		if data.ScreenOpts != nil {
+			@InlineForm(*data.ScreenOpts, "gocms-list-screen-options", data.Marker+"-screen-options")
+		}
+		if data.QuickEdit != nil {
+			@InlineForm(*data.QuickEdit, "gocms-list-quick-edit", data.Marker+"-quick-edit")
+		}
 		if data.FormAction != "" && len(data.Fields) > 0 {
 			@ui.Form(ui.FormProps{Action: data.FormAction, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": data.Marker + "-save"}}) {
 				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
@@ -289,26 +353,67 @@ templ SimpleList(data SimpleListData) {
 				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SaveLabel, "Save"))
 			}
 		}
-		@ui.Table(ui.TableProps{}) {
-			@ui.TableHead(ui.TableSectionProps{}) {
-				@ui.TableRow(ui.TableRowProps{}) {
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Name, "Name") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Description, "Description") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
-					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
+		if data.Bulk != nil {
+			@ui.Form(ui.FormProps{Action: data.Bulk.Action, Method: "post", Class: "gocms-form-grid", Attrs: templpkg.Attributes{"data-gocms-action": data.Marker + "-bulk"}}) {
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Bulk.Token})
+				for _, field := range data.Bulk.Fields {
+					@ui.Field(toFieldProps(field))
 				}
+				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.Bulk.SubmitLabel, "Apply"))
+				@SimpleListMarkup(data, true)
 			}
-			@ui.TableBody(ui.TableSectionProps{}) {
-				for _, row := range data.Rows {
-					@ui.TableRow(ui.TableRowProps{}) {
+		} else {
+			@SimpleListMarkup(data, false)
+		}
+		@elements.PaginationControl(data.Pagination)
+	}
+}
+
+templ SimpleListMarkup(data SimpleListData, selectable bool) {
+	@ui.Table(ui.TableProps{}) {
+		@ui.TableHead(ui.TableSectionProps{}) {
+			@ui.TableRow(ui.TableRowProps{}) {
+				if selectable {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { Selection }
+				}
+				if simpleColumnVisible(data.Visible, "name") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Name, "Name") } }
+				}
+				if simpleColumnVisible(data.Visible, "description") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Description, "Description") } }
+				}
+				if simpleColumnVisible(data.Visible, "status") {
+					@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Status, "Status") } }
+				}
+				@ui.TableHeadCell(ui.TableCellProps{Scope: "col"}) { { fallbackLabel(data.Headers.Actions, "Actions") } }
+			}
+		}
+		@ui.TableBody(ui.TableSectionProps{}) {
+			for _, row := range data.Rows {
+				@ui.TableRow(ui.TableRowProps{}) {
+					if selectable {
+						@ui.TableCell(ui.TableCellProps{}) {
+							@ui.Field(ui.FieldProps{ID: "select-row-" + row.ID, Name: "selected_id", Type: "checkbox", Value: row.ID})
+						}
+					}
+					if simpleColumnVisible(data.Visible, "name") {
 						@ui.TableCell(ui.TableCellProps{}) { { row.Label } }
+					}
+					if simpleColumnVisible(data.Visible, "description") {
 						@ui.TableCell(ui.TableCellProps{}) { { row.Description } }
+					}
+					if simpleColumnVisible(data.Visible, "status") {
 						@ui.TableCell(ui.TableCellProps{}) {
 							@elements.StatusBadge(row.Status)
 						}
-						@ui.TableCell(ui.TableCellProps{}) {
+					}
+					@ui.TableCell(ui.TableCellProps{}) {
+						@ui.Group(ui.GroupProps{}) {
 							if row.ActionURL != "" {
 								@ui.Button(ui.ButtonProps{Href: row.ActionURL, Variant: "outline"}, fallbackLabel(data.OpenLabel, "Open"))
+							}
+							if row.QuickEditURL != "" {
+								@ui.Button(ui.ButtonProps{Href: row.QuickEditURL, Variant: "outline"}, fallbackLabel(data.QuickLabel, "Quick edit"))
 							}
 						}
 					}
@@ -316,4 +421,56 @@ templ SimpleList(data SimpleListData) {
 			}
 		}
 	}
+}
+
+templ InlineForm(data InlineFormData, className string, marker string) {
+	@elements.MarkerDiv(elements.MarkerProps{
+		Class: className,
+		Attrs: templpkg.Attributes{"data-gocms-inline-form": marker},
+	}) {
+		if data.Title != "" {
+			@ui.Title(ui.TitleProps{Order: 3}, data.Title)
+		}
+		@elements.FieldHelp(data.Description)
+		@ui.Form(ui.FormProps{
+			Action: data.Action,
+			Method: inlineMethod(data.Method),
+			Class:  "gocms-form-grid",
+			Attrs:  templpkg.Attributes{"data-gocms-action": marker},
+		}) {
+			if data.Token != "" {
+				@ui.Field(ui.FieldProps{Type: "hidden", Name: "action_token", Value: data.Token})
+			}
+			for _, field := range data.Fields {
+				@ui.Field(toFieldProps(field))
+			}
+			@ui.Group(ui.GroupProps{Class: "gocms-admin-actions"}) {
+				@ui.Button(ui.ButtonProps{Type: "submit"}, fallbackLabel(data.SubmitLabel, "Save"))
+				if data.CancelHref != "" {
+					@ui.Button(ui.ButtonProps{Href: data.CancelHref, Variant: "outline"}, fallbackLabel(data.CancelLabel, "Cancel"))
+				}
+			}
+		}
+	}
+}
+
+func inlineMethod(value string) string {
+	if value != "" {
+		return value
+	}
+	return "post"
+}
+
+func contentColumnVisible(visible map[string]bool, id string) bool {
+	if len(visible) == 0 {
+		return true
+	}
+	return visible[id]
+}
+
+func simpleColumnVisible(visible map[string]bool, id string) bool {
+	if len(visible) == 0 {
+		return true
+	}
+	return visible[id]
 }

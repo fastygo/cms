@@ -42,3 +42,23 @@ func TestResolveRejectsUnimplementedBootstrapProviders(t *testing.T) {
 		t.Fatalf("expected bbolt provider to be declared but not implemented")
 	}
 }
+
+func TestResolveDocumentsBrowserIndexedDBShimCapabilities(t *testing.T) {
+	runtime, err := NewRegistry().Resolve(ProviderPlan{
+		StorageProfile: "browser-indexeddb",
+		DataSource:     "file:ignored-durable-source.db",
+	})
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Store.Close(context.Background())
+	})
+	capabilities := runtime.ProviderCapabilities
+	if !capabilities.BrowserLocal || !capabilities.Transitional || !capabilities.UsesSQLiteShim {
+		t.Fatalf("browser-indexeddb capabilities should document transitional shim behavior: %+v", capabilities)
+	}
+	if !capabilities.BlobStorageBoundary {
+		t.Fatalf("browser-local media must be tracked as a blob storage boundary")
+	}
+}

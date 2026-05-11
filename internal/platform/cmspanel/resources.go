@@ -102,16 +102,30 @@ func contentResource(options contentResourceOptions) ContentResource {
 			Table: panel.TableSchema[authz.Capability]{
 				ID: "content-list",
 				Columns: []panel.Column{
-					{ID: "title", Label: "Title", Type: panel.ColumnText, Searchable: true, Sortable: true},
-					{ID: "slug", Label: "Slug", Type: panel.ColumnText, Searchable: true},
-					{ID: "status", Label: "Status", Type: panel.ColumnBadge, Sortable: true},
-					{ID: "author", Label: "Author", Type: panel.ColumnText, Searchable: true},
+					{ID: "title", Label: "Title", Type: panel.ColumnText, Searchable: true, Sortable: true, Toggleable: true},
+					{ID: "slug", Label: "Slug", Type: panel.ColumnText, Searchable: true, Sortable: true, Toggleable: true},
+					{ID: "status", Label: "Status", Type: panel.ColumnBadge, Toggleable: true},
+					{ID: "author", Label: "Author", Type: panel.ColumnText, Searchable: true, Toggleable: true},
+				},
+				Filters: []panel.Filter{
+					{
+						ID:      "status",
+						Label:   "Status",
+						Type:    panel.FilterSelect,
+						Options: []panel.Option{{Value: "draft", Label: "Draft"}, {Value: "published", Label: "Published"}, {Value: "scheduled", Label: "Scheduled"}, {Value: "trashed", Label: "Trashed"}},
+					},
+					{ID: "author", Label: "Author", Type: panel.FilterText},
 				},
 				DefaultSort: panel.Sort{ColumnID: "updated_at", Direction: panel.SortDesc},
 				Searchable:  true,
 				PerPage:     []int{25, 50, 100},
 				RowActions: []panel.Action[authz.Capability]{
 					{ID: "edit", Label: "Edit", Placement: panel.ActionRow, Style: panel.ActionLink, Capability: authz.CapabilityContentEdit},
+				},
+				BulkActions: []panel.Action[authz.Capability]{
+					{ID: "publish", Label: "Publish", Placement: panel.ActionBulk, Style: panel.ActionButton, Capability: authz.CapabilityContentPublish},
+					{ID: "trash", Label: "Trash", Placement: panel.ActionBulk, Style: panel.ActionButton, Capability: authz.CapabilityContentDelete},
+					{ID: "restore", Label: "Restore", Placement: panel.ActionBulk, Style: panel.ActionButton, Capability: authz.CapabilityContentRestore},
 				},
 			},
 			Form: panel.FormSchema{
@@ -126,8 +140,6 @@ func contentResource(options contentResourceOptions) ContentResource {
 					{ID: "featured_media_id", Label: "Featured media ID", Type: panel.FieldText},
 					{ID: "template", Label: "Template", Type: panel.FieldText},
 					{ID: "terms", Label: "Taxonomy terms", Type: panel.FieldText, Placeholder: "category:news,tag:go"},
-					{ID: "meta_key", Label: "Metadata key", Type: panel.FieldText, Placeholder: "seo_title"},
-					{ID: "meta_value", Label: "Metadata value", Type: panel.FieldText},
 				},
 			},
 			Actions: []panel.Action[authz.Capability]{

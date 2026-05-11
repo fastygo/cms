@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	domainauthz "github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 )
 
 type Repository interface {
@@ -24,9 +26,11 @@ type TypeRegistry interface {
 type Clock func() time.Time
 
 type Service struct {
-	repo  Repository
-	types TypeRegistry
-	clock Clock
+	repo       Repository
+	types      TypeRegistry
+	clock      Clock
+	meta       *appmeta.Registry
+	hookGetter func() *platformplugins.Registry
 }
 
 type CreateDraftCommand struct {
@@ -55,11 +59,38 @@ type UpdateCommand struct {
 	Terms           []domaincontent.TermRef
 }
 
-func NewService(repo Repository, types TypeRegistry, clock Clock) Service {
+type Option func(*Service)
+
+func WithMetadataRegistry(registry *appmeta.Registry) Option {
+	return func(service *Service) {
+		service.meta = registry
+	}
+}
+
+func WithHookRegistry(getter func() *platformplugins.Registry) Option {
+	return func(service *Service) {
+		service.hookGetter = getter
+	}
+}
+
+type MetadataHookPayload struct {
+	Operation string
+	ContentID domaincontent.ID
+	Kind      domaincontent.Kind
+	Metadata  domaincontent.Metadata
+}
+
+func NewService(repo Repository, types TypeRegistry, clock Clock, options ...Option) Service {
 	if clock == nil {
 		clock = time.Now
 	}
-	return Service{repo: repo, types: types, clock: clock}
+	service := Service{repo: repo, types: types, clock: clock}
+	for _, option := range options {
+		if option != nil {
+			option(&service)
+		}
+	}
+	return service
 }
 
 func (s Service) CreateDraft(ctx context.Context, principal domainauthz.Principal, cmd CreateDraftCommand) (domaincontent.Entry, error) {
@@ -67,6 +98,10 @@ func (s Service) CreateDraft(ctx context.Context, principal domainauthz.Principa
 		return domaincontent.Entry{}, fmt.Errorf("capability %q is required", domainauthz.CapabilityContentCreate)
 	}
 	if err := s.ensureKind(ctx, cmd.Kind); err != nil {
+		return domaincontent.Entry{}, err
+	}
+	metadata, err := s.normalizeMetadata(ctx, principal, "create", "", cmd.Kind, cmd.Metadata)
+	if err != nil {
 		return domaincontent.Entry{}, err
 	}
 	id, err := s.repo.NextID(ctx)
@@ -86,12 +121,18 @@ func (s Service) CreateDraft(ctx context.Context, principal domainauthz.Principa
 		AuthorID:        firstNonEmpty(cmd.AuthorID, principal.ID),
 		FeaturedMediaID: cmd.FeaturedMediaID,
 		Template:        cmd.Template,
-		Metadata:        cmd.Metadata,
+		Metadata:        metadata,
 		Terms:           cmd.Terms,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.persist.before", "create", entry.ID, entry.Kind, entry.Metadata); err != nil {
+		return domaincontent.Entry{}, err
+	}
 	if err := s.repo.Save(ctx, entry); err != nil {
+		return domaincontent.Entry{}, err
+	}
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.persist.after", "create", entry.ID, entry.Kind, entry.Metadata); err != nil {
 		return domaincontent.Entry{}, err
 	}
 	return entry, nil
@@ -105,6 +146,10 @@ func (s Service) Update(ctx context.Context, principal domainauthz.Principal, cm
 	if err := requireEdit(principal, entry); err != nil {
 		return domaincontent.Entry{}, err
 	}
+	metadata, err := s.normalizeMetadata(ctx, principal, "update", entry.ID, entry.Kind, cmd.Metadata)
+	if err != nil {
+		return domaincontent.Entry{}, err
+	}
 	entry.Title = cmd.Title
 	entry.Slug = cmd.Slug
 	entry.Body = cmd.Body
@@ -114,10 +159,16 @@ func (s Service) Update(ctx context.Context, principal domainauthz.Principal, cm
 	}
 	entry.FeaturedMediaID = cmd.FeaturedMediaID
 	entry.Template = cmd.Template
-	entry.Metadata = cmd.Metadata
+	entry.Metadata = metadata
 	entry.Terms = cmd.Terms
 	entry.UpdatedAt = s.clock()
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.persist.before", "update", entry.ID, entry.Kind, entry.Metadata); err != nil {
+		return domaincontent.Entry{}, err
+	}
 	if err := s.repo.Save(ctx, entry); err != nil {
+		return domaincontent.Entry{}, err
+	}
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.persist.after", "update", entry.ID, entry.Kind, entry.Metadata); err != nil {
 		return domaincontent.Entry{}, err
 	}
 	return entry, nil
@@ -256,4 +307,46 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (s Service) normalizeMetadata(ctx context.Context, principal domainauthz.Principal, operation string, contentID domaincontent.ID, kind domaincontent.Kind, metadata domaincontent.Metadata) (domaincontent.Metadata, error) {
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.validate.before", operation, contentID, kind, metadata); err != nil {
+		return nil, err
+	}
+	if s.meta == nil {
+		if err := s.dispatchMetadataAction(ctx, "content.metadata.validate.after", operation, contentID, kind, metadata); err != nil {
+			return nil, err
+		}
+		return metadata, nil
+	}
+	normalized, err := s.meta.Normalize(principal, kind, metadata)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.dispatchMetadataAction(ctx, "content.metadata.validate.after", operation, contentID, kind, normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
+func (s Service) dispatchMetadataAction(ctx context.Context, hookID string, operation string, contentID domaincontent.ID, kind domaincontent.Kind, metadata domaincontent.Metadata) error {
+	if s.hookGetter == nil {
+		return nil
+	}
+	registry := s.hookGetter()
+	if registry == nil {
+		return nil
+	}
+	return registry.DispatchAction(ctx, hookID, platformplugins.HookContext{
+		Metadata: map[string]any{
+			"operation":  operation,
+			"content_id": string(contentID),
+			"kind":       string(kind),
+		},
+	}, MetadataHookPayload{
+		Operation: operation,
+		ContentID: contentID,
+		Kind:      kind,
+		Metadata:  metadata,
+	})
 }

@@ -3,8 +3,10 @@ package cmspanel
 import (
 	"testing"
 
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	"github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
+	domainmeta "github.com/fastygo/cms/internal/domain/meta"
 	"github.com/fastygo/panel"
 )
 
@@ -121,7 +123,7 @@ func assertContentResource(t *testing.T, resource ContentResource, id string, ki
 	if len(resource.Table.Columns) != 4 {
 		t.Fatalf("table columns = %v, want title/slug/status/author", resource.Table.Columns)
 	}
-	if len(resource.Form.Fields) != 10 {
+	if len(resource.Form.Fields) != 8 {
 		t.Fatalf("form fields = %v, want content editor fields", resource.Form.Fields)
 	}
 	if field := fieldByID(resource.Form.Fields, "content"); field.Type != panel.FieldRichText {
@@ -160,6 +162,38 @@ func assertContentResource(t *testing.T, resource ContentResource, id string, ki
 		if got.Pattern != want.pattern || got.Capability != want.capability {
 			t.Fatalf("route %q = %+v, want pattern=%q capability=%q", role, got, want.pattern, want.capability)
 		}
+	}
+}
+
+func TestMetadataFieldsGenerateRegisteredAndFallbackInputs(t *testing.T) {
+	fields := MetadataFields([]domainmeta.Definition{
+		{
+			Key:       "seo_title",
+			Label:     "SEO title",
+			Owner:     "test",
+			Scope:     domainmeta.ScopeContent,
+			Type:      domainmeta.ValueTypeString,
+			FieldHint: domainmeta.FieldHintText,
+			Public:    true,
+		},
+		{
+			Key:       "seo_noindex",
+			Label:     "Noindex",
+			Owner:     "test",
+			Scope:     domainmeta.ScopeContent,
+			Type:      domainmeta.ValueTypeBoolean,
+			FieldHint: domainmeta.FieldHintCheckbox,
+			Public:    true,
+		},
+	})
+	if got := fieldByID(fields, appmeta.FormFieldName("seo_title")); got.Type != panel.FieldText {
+		t.Fatalf("seo_title field = %+v", got)
+	}
+	if got := fieldByID(fields, appmeta.FormFieldName("seo_noindex")); got.Type != panel.FieldBoolean {
+		t.Fatalf("seo_noindex field = %+v", got)
+	}
+	if got := fieldByID(fields, "custom_meta_key"); got.Type != panel.FieldText {
+		t.Fatalf("custom_meta_key field = %+v", got)
 	}
 }
 

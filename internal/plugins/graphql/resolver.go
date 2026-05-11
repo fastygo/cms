@@ -11,6 +11,7 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 
 	appcontent "github.com/fastygo/cms/internal/application/content"
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	domainauthz "github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
@@ -19,10 +20,14 @@ import (
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/plugins"
+	"github.com/fastygo/framework/pkg/web/locale"
 )
 
 type rootResolver struct {
-	services Services
+	services     Services
+	registry     *plugins.Registry
+	metaRegistry *appmeta.Registry
 }
 
 type contentListArgs struct {
@@ -575,6 +580,8 @@ func (r *rootResolver) newContentResolver(ctx context.Context, entry domainconte
 	return &contentResolver{
 		item:           entry,
 		includePrivate: !publicOnly(ctx),
+		registry:       r.registry,
+		metaRegistry:   r.metaRegistry,
 	}
 }
 
@@ -617,6 +624,8 @@ func (r *paginationResolver) TotalPages() int32 {
 type contentResolver struct {
 	item           domaincontent.Entry
 	includePrivate bool
+	registry       *plugins.Registry
+	metaRegistry   *appmeta.Registry
 }
 
 func (r *contentResolver) ID() graphql.ID {
@@ -635,20 +644,36 @@ func (r *contentResolver) Visibility() string {
 	return string(r.item.Visibility)
 }
 
-func (r *contentResolver) Slug() JSONValue {
-	return JSONValue{Value: map[string]string(r.item.Slug)}
+func (r *contentResolver) Slug(ctx context.Context) (JSONValue, error) {
+	projection, err := r.projection(ctx)
+	if err != nil {
+		return JSONValue{}, err
+	}
+	return JSONValue{Value: projection.Slug}, nil
 }
 
-func (r *contentResolver) Title() JSONValue {
-	return JSONValue{Value: map[string]string(r.item.Title)}
+func (r *contentResolver) Title(ctx context.Context) (JSONValue, error) {
+	projection, err := r.projection(ctx)
+	if err != nil {
+		return JSONValue{}, err
+	}
+	return JSONValue{Value: projection.Title}, nil
 }
 
-func (r *contentResolver) Content() JSONValue {
-	return JSONValue{Value: map[string]string(r.item.Body)}
+func (r *contentResolver) Content(ctx context.Context) (JSONValue, error) {
+	projection, err := r.projection(ctx)
+	if err != nil {
+		return JSONValue{}, err
+	}
+	return JSONValue{Value: projection.Content}, nil
 }
 
-func (r *contentResolver) Excerpt() JSONValue {
-	return JSONValue{Value: map[string]string(r.item.Excerpt)}
+func (r *contentResolver) Excerpt(ctx context.Context) (JSONValue, error) {
+	projection, err := r.projection(ctx)
+	if err != nil {
+		return JSONValue{}, err
+	}
+	return JSONValue{Value: projection.Excerpt}, nil
 }
 
 func (r *contentResolver) AuthorID() string {
@@ -676,11 +701,12 @@ func (r *contentResolver) Template() string {
 	return r.item.Template
 }
 
-func (r *contentResolver) Metadata() JSONValue {
-	if r.includePrivate {
-		return JSONValue{Value: metadataJSON(r.item.Metadata)}
+func (r *contentResolver) Metadata(ctx context.Context) (JSONValue, error) {
+	projection, err := r.projection(ctx)
+	if err != nil {
+		return JSONValue{}, err
 	}
-	return JSONValue{Value: metadataJSON(r.item.Metadata.Public())}
+	return JSONValue{Value: projection.Metadata}, nil
 }
 
 func (r *contentResolver) Links() JSONValue {
@@ -701,6 +727,55 @@ func (r *contentResolver) PublishedAt() *graphql.Time {
 
 func (r *contentResolver) DeletedAt() *graphql.Time {
 	return timePointer(r.item.DeletedAt)
+}
+
+func (r *contentResolver) projection(ctx context.Context) (plugins.ContentProjection, error) {
+	projection := plugins.ContentProjection{
+		Slug:    localizedJSON(r.item.Slug),
+		Title:   localizedJSON(r.item.Title),
+		Content: localizedJSON(r.item.Body),
+		Excerpt: localizedJSON(r.item.Excerpt),
+	}
+	allowedMetadata := r.item.Metadata.Public()
+	if r.registry != nil || r.metaRegistry != nil {
+		allowedMetadata = metadataProjection(r.metaRegistry, r.item, r.includePrivate)
+	} else if r.includePrivate {
+		allowedMetadata = r.item.Metadata
+	}
+	projection.Metadata = metadataJSON(allowedMetadata)
+	filteredMetadata, err := plugins.FilterValue(ctx, r.registry, "content.metadata.public.filter", plugins.HookContext{
+		Surface:       plugins.SurfaceREST,
+		Path:          "/go-graphql",
+		Locale:        locale.From(ctx),
+		Principal:     stateFromContext(ctx).principal,
+		Authenticated: stateFromContext(ctx).authenticated,
+		Metadata: map[string]any{
+			"resource":        "content-metadata",
+			"include_private": r.includePrivate,
+			"content_id":      string(r.item.ID),
+		},
+	}, projection.Metadata)
+	if err != nil {
+		return plugins.ContentProjection{}, err
+	}
+	projection.Metadata = sanitizeFilteredMetadata(filteredMetadata, allowedMetadata)
+	filtered, err := plugins.FilterValue(ctx, r.registry, "graphql.content.filter", plugins.HookContext{
+		Surface:       plugins.SurfacePublic,
+		Path:          "/go-graphql",
+		Locale:        locale.From(ctx),
+		Principal:     stateFromContext(ctx).principal,
+		Authenticated: stateFromContext(ctx).authenticated,
+		Metadata: map[string]any{
+			"resource":        "content",
+			"include_private": r.includePrivate,
+			"content_id":      string(r.item.ID),
+		},
+	}, projection)
+	if err != nil {
+		return plugins.ContentProjection{}, err
+	}
+	filtered.Metadata = sanitizeFilteredMetadata(filtered.Metadata, allowedMetadata)
+	return filtered, nil
 }
 
 type termAssignmentResolver struct {
@@ -995,6 +1070,39 @@ func metadataJSON(metadata domaincontent.Metadata) map[string]any {
 	out := make(map[string]any, len(metadata))
 	for key, value := range metadata {
 		out[key] = value.Value
+	}
+	return out
+}
+
+func metadataProjection(metaRegistry *appmeta.Registry, entry domaincontent.Entry, includePrivate bool) domaincontent.Metadata {
+	if metaRegistry == nil {
+		if includePrivate {
+			return entry.Metadata
+		}
+		return entry.Metadata.Public()
+	}
+	return metaRegistry.PublicMetadata(entry.Kind, entry.Metadata, includePrivate)
+}
+
+func localizedJSON(value domaincontent.LocalizedText) map[string]string {
+	out := make(map[string]string, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
+}
+
+func sanitizeFilteredMetadata(filtered map[string]any, allowed domaincontent.Metadata) map[string]any {
+	if len(filtered) == 0 || len(allowed) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(filtered))
+	for key := range allowed {
+		value, ok := filtered[key]
+		if !ok {
+			continue
+		}
+		out[key] = value
 	}
 	return out
 }

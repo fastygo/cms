@@ -24,10 +24,10 @@ func New(service snapshot.Service, sitePackage jsondir.Provider) Plugin {
 
 func (p Plugin) Manifest() plugins.Manifest {
 	return plugins.Manifest{
-		ID:       "json-import-export",
-		Name:     "JSON Import Export",
-		Version:  "0.1.0",
-		Contract: "0.1",
+		ID:          "json-import-export",
+		Name:        "JSON Import Export",
+		Version:     "0.1.0",
+		Contract:    "0.1",
 		Description: "Exports and imports GoCMS content snapshots as JSON or site package files.",
 		Capabilities: []plugins.CapabilityDefinition{
 			{ID: "json-import-export.manage", Description: "Manage JSON snapshot import and export workflows."},
@@ -49,6 +49,10 @@ func (p Plugin) Register(_ context.Context, registry *plugins.Registry) error {
 	registry.AddCapabilities(manifest.Capabilities...)
 	registry.AddSettings(manifest.Settings...)
 	registry.AddHooks(manifest.Hooks...)
+	registry.AddActionHandlers(plugins.ActionHandlerRegistration{
+		Hook:   manifest.Hooks[0],
+		Handle: func(context.Context, plugins.HookContext, any) error { return nil },
+	})
 	registry.AddAssets(manifest.Assets...)
 	registry.AddScreenActions(
 		plugins.ScreenActionRegistration{ScreenID: "settings", Build: p.actions},

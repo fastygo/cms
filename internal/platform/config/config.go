@@ -21,18 +21,19 @@ const (
 
 // Config contains all runtime configuration resolved by the composition root.
 type Config struct {
-	Framework        app.Config
-	SeedFixtures     bool
-	RuntimeProfile   string
-	StorageProfile   string
-	Preset           string
-	ActivePlugins    []string
-	SitePackageDir   string
-	PlaygroundAuth   bool
-	BrowserStateless bool
-	EnableDevBearer  bool
-	LoginPolicy      string
-	AdminPolicy      string
+	Framework         app.Config
+	SeedFixtures      bool
+	RuntimeProfile    string
+	StorageProfile    string
+	DeploymentProfile string
+	Preset            string
+	ActivePlugins     []string
+	SitePackageDir    string
+	PlaygroundAuth    bool
+	BrowserStateless  bool
+	EnableDevBearer   bool
+	LoginPolicy       string
+	AdminPolicy       string
 }
 
 // Load reads environment configuration and applies GoCMS pass-0 defaults.
@@ -48,33 +49,35 @@ func Load() (Config, error) {
 	}
 
 	plan := preset.Resolve(preset.Options{
-		Preset:          os.Getenv("GOCMS_PRESET"),
-		RuntimeProfile:  os.Getenv("GOCMS_RUNTIME_PROFILE"),
-		StorageProfile:  os.Getenv("GOCMS_STORAGE_PROFILE"),
-		AppBind:         os.Getenv("APP_BIND"),
-		DataSource:      frameworkConfig.DataSource,
-		PluginSet:       os.Getenv("GOCMS_PLUGIN_SET"),
-		SitePackageDir:  os.Getenv("GOCMS_SITE_PACKAGE_DIR"),
-		EnableDevBearer: os.Getenv("GOCMS_ENABLE_DEV_BEARER"),
-		LoginPolicy:     os.Getenv("GOCMS_LOGIN_POLICY"),
-		AdminPolicy:     os.Getenv("GOCMS_ADMIN_POLICY"),
+		Preset:            os.Getenv("GOCMS_PRESET"),
+		RuntimeProfile:    os.Getenv("GOCMS_RUNTIME_PROFILE"),
+		StorageProfile:    os.Getenv("GOCMS_STORAGE_PROFILE"),
+		DeploymentProfile: os.Getenv("GOCMS_DEPLOYMENT_PROFILE"),
+		AppBind:           os.Getenv("APP_BIND"),
+		DataSource:        frameworkConfig.DataSource,
+		PluginSet:         os.Getenv("GOCMS_PLUGIN_SET"),
+		SitePackageDir:    os.Getenv("GOCMS_SITE_PACKAGE_DIR"),
+		EnableDevBearer:   os.Getenv("GOCMS_ENABLE_DEV_BEARER"),
+		LoginPolicy:       os.Getenv("GOCMS_LOGIN_POLICY"),
+		AdminPolicy:       os.Getenv("GOCMS_ADMIN_POLICY"),
 	})
 	frameworkConfig.AppBind = plan.AppBind
 	frameworkConfig.DataSource = plan.DataSource
 
 	return Config{
-		Framework:        frameworkConfig,
-		SeedFixtures:     parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
-		RuntimeProfile:   plan.RuntimeProfile,
-		StorageProfile:   plan.StorageProfile,
-		Preset:           plan.Name,
-		ActivePlugins:    plan.ActivePlugins,
-		SitePackageDir:   plan.SitePackageDir,
-		PlaygroundAuth:   plan.PlaygroundAuth,
-		BrowserStateless: plan.BrowserStateless,
-		EnableDevBearer:  plan.EnableDevBearer,
-		LoginPolicy:      plan.LoginPolicy,
-		AdminPolicy:      plan.AdminPolicy,
+		Framework:         frameworkConfig,
+		SeedFixtures:      parseBool(os.Getenv("GOCMS_SEED_FIXTURES"), true),
+		RuntimeProfile:    plan.RuntimeProfile,
+		StorageProfile:    plan.StorageProfile,
+		DeploymentProfile: plan.DeploymentProfile,
+		Preset:            plan.Name,
+		ActivePlugins:     plan.ActivePlugins,
+		SitePackageDir:    plan.SitePackageDir,
+		PlaygroundAuth:    plan.PlaygroundAuth,
+		BrowserStateless:  plan.BrowserStateless,
+		EnableDevBearer:   plan.EnableDevBearer,
+		LoginPolicy:       plan.LoginPolicy,
+		AdminPolicy:       plan.AdminPolicy,
 	}, nil
 }
 
@@ -138,6 +141,16 @@ func normalizeStorageProfile(raw string) string {
 		return raw
 	}
 	return string(runtimeprofile.DefaultStorageProfile)
+}
+
+func normalizeDeploymentProfile(raw string) string {
+	if raw == "" {
+		return string(runtimeprofile.DefaultDeploymentProfile)
+	}
+	if err := runtimeprofile.ValidateDeploymentProfile(raw); err == nil {
+		return raw
+	}
+	return string(runtimeprofile.DefaultDeploymentProfile)
 }
 
 func parseBool(value string, fallback bool) bool {

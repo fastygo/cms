@@ -169,6 +169,34 @@ func TestAdminContentWorkflowAndCapabilityChecks(t *testing.T) {
 	}
 }
 
+func TestAdminContentEditorShowsGeneratedMetadataFields(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/posts/new", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected editor page, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{
+		`name="meta__seo_title"`,
+		`name="meta__seo_description"`,
+		`name="meta__seo_canonical_url"`,
+		`name="meta__seo_noindex"`,
+		`name="custom_meta_key"`,
+		`name="custom_meta_value"`,
+	} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected editor to contain %q", expected)
+		}
+	}
+	if strings.Contains(rec.Body.String(), `name="meta_key"`) {
+		t.Fatalf("legacy generic metadata field should not be rendered")
+	}
+}
+
 func TestAdminScreensRenderSinglePageDescription(t *testing.T) {
 	mux, closeFn := newAdminMux(t)
 	defer closeFn()
@@ -271,6 +299,272 @@ func TestAdminTaxonomyAndSettingsWorkflows(t *testing.T) {
 	mux.ServeHTTP(save, saveReq)
 	if save.Code != http.StatusSeeOther {
 		t.Fatalf("expected settings redirect, got %d: %s", save.Code, save.Body.String())
+	}
+}
+
+func TestAdminMediaMetadataFormAndValidation(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	page := httptest.NewRecorder()
+	pageReq := httptest.NewRequest(http.MethodGet, "/go-admin/media", nil)
+	pageReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(page, pageReq)
+	if page.Code != http.StatusOK {
+		t.Fatalf("expected media page, got %d: %s", page.Code, page.Body.String())
+	}
+	token := extractToken(t, page.Body.String())
+	for _, expected := range []string{
+		`name="provider"`,
+		`name="provider_key"`,
+		`name="provider_url"`,
+		`name="provider_checksum"`,
+		`name="provider_etag"`,
+	} {
+		if !strings.Contains(page.Body.String(), expected) {
+			t.Fatalf("expected media form to contain %q", expected)
+		}
+	}
+
+	invalid := url.Values{
+		"action_token": {token},
+		"id":           {"media-invalid"},
+		"filename":     {"cover.txt"},
+		"mime_type":    {"text/plain"},
+		"public_url":   {"https://cdn.example.test/cover.txt"},
+	}
+	invalidRec := httptest.NewRecorder()
+	invalidReq := httptest.NewRequest(http.MethodPost, "/go-admin/media", strings.NewReader(invalid.Encode()))
+	invalidReq.Header.Set("Authorization", "Bearer admin-token")
+	invalidReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(invalidRec, invalidReq)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid media metadata to be rejected, got %d: %s", invalidRec.Code, invalidRec.Body.String())
+	}
+
+	valid := url.Values{
+		"action_token":      {token},
+		"id":                {"media-remote"},
+		"filename":          {"cover.webp"},
+		"mime_type":         {"image/webp"},
+		"size_bytes":        {"2048"},
+		"width":             {"1024"},
+		"height":            {"512"},
+		"public_url":        {"https://cdn.example.test/cover.webp"},
+		"alt_text":          {"Remote cover"},
+		"caption":           {"Stored by provider metadata only."},
+		"provider":          {"s3"},
+		"provider_key":      {"media/originals/cover.webp"},
+		"provider_url":      {"https://bucket.example.test/cover.webp"},
+		"provider_checksum": {"sha256:test"},
+		"provider_etag":     {"etag-1"},
+	}
+	validRec := httptest.NewRecorder()
+	validReq := httptest.NewRequest(http.MethodPost, "/go-admin/media", strings.NewReader(valid.Encode()))
+	validReq.Header.Set("Authorization", "Bearer admin-token")
+	validReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(validRec, validReq)
+	if validRec.Code != http.StatusSeeOther {
+		t.Fatalf("expected valid media metadata redirect, got %d: %s", validRec.Code, validRec.Body.String())
+	}
+}
+
+func TestAdminContentListControlsAndScreenPreferences(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	list := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/posts?search=Published&filter_status=published&columns=title,status", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(list, req)
+	if list.Code != http.StatusOK {
+		t.Fatalf("expected posts list, got %d: %s", list.Code, list.Body.String())
+	}
+	body := list.Body.String()
+	for _, expected := range []string{
+		`name="search"`,
+		`name="filter_status"`,
+		`name="sort"`,
+		`name="bulk_action"`,
+		`edit=content-post-published`,
+		`value="title,status"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected posts list to contain %q", expected)
+		}
+	}
+	if !strings.Contains(body, "Published Post") {
+		t.Fatalf("expected filtered list to include published post")
+	}
+	if strings.Contains(body, "Draft Post") {
+		t.Fatalf("draft post should be filtered out by published status")
+	}
+
+	token := extractTokenForAction(t, body, "content-screen-options")
+	savePrefs := httptest.NewRecorder()
+	form := url.Values{
+		"action_token": {token},
+		"per_page":     {"100"},
+		"columns":      {"title,status"},
+		"return_to":    {"/go-admin/posts"},
+	}
+	saveReq := httptest.NewRequest(http.MethodPost, "/go-admin/preferences/posts", strings.NewReader(form.Encode()))
+	saveReq.Header.Set("Authorization", "Bearer admin-token")
+	saveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(savePrefs, saveReq)
+	if savePrefs.Code != http.StatusSeeOther {
+		t.Fatalf("expected screen preference redirect, got %d: %s", savePrefs.Code, savePrefs.Body.String())
+	}
+
+	updated := httptest.NewRecorder()
+	updatedReq := httptest.NewRequest(http.MethodGet, "/go-admin/posts", nil)
+	updatedReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(updated, updatedReq)
+	if !strings.Contains(updated.Body.String(), `value="title,status"`) {
+		t.Fatalf("expected saved columns preference to be rendered")
+	}
+}
+
+func TestAdminUsersQuickEditAndBulkStatus(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/users?edit=author-1", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(page, req)
+	if page.Code != http.StatusOK {
+		t.Fatalf("expected users page, got %d: %s", page.Code, page.Body.String())
+	}
+	body := page.Body.String()
+	for _, expected := range []string{
+		`name="display_name"`,
+		`name="status"`,
+		`status:suspended`,
+		`edit=author-1`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected users page to contain %q", expected)
+		}
+	}
+	token := extractToken(t, body)
+
+	quickEdit := httptest.NewRecorder()
+	quickForm := url.Values{
+		"action_token": {token},
+		"id":           {"author-1"},
+		"login":        {"jane"},
+		"display_name": {"Jane Editor"},
+		"email":        {"jane@example.test"},
+		"status":       {"suspended"},
+		"return_to":    {"/go-admin/users"},
+	}
+	quickReq := httptest.NewRequest(http.MethodPost, "/go-admin/users", strings.NewReader(quickForm.Encode()))
+	quickReq.Header.Set("Authorization", "Bearer admin-token")
+	quickReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(quickEdit, quickReq)
+	if quickEdit.Code != http.StatusSeeOther {
+		t.Fatalf("expected quick edit redirect, got %d: %s", quickEdit.Code, quickEdit.Body.String())
+	}
+
+	suspended := httptest.NewRecorder()
+	suspendedReq := httptest.NewRequest(http.MethodGet, "/go-admin/users?filter_status=suspended", nil)
+	suspendedReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(suspended, suspendedReq)
+	if !strings.Contains(suspended.Body.String(), "Jane Editor") || !strings.Contains(suspended.Body.String(), "suspended") {
+		t.Fatalf("expected quick edited user to be suspended: %s", suspended.Body.String())
+	}
+
+	bulk := httptest.NewRecorder()
+	bulkForm := url.Values{
+		"action_token": {token},
+		"bulk_action":  {"status:active"},
+		"selected_id":  {"author-1"},
+		"return_to":    {"/go-admin/users"},
+	}
+	bulkReq := httptest.NewRequest(http.MethodPost, "/go-admin/users", strings.NewReader(bulkForm.Encode()))
+	bulkReq.Header.Set("Authorization", "Bearer admin-token")
+	bulkReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(bulk, bulkReq)
+	if bulk.Code != http.StatusSeeOther {
+		t.Fatalf("expected bulk update redirect, got %d: %s", bulk.Code, bulk.Body.String())
+	}
+
+	active := httptest.NewRecorder()
+	activeReq := httptest.NewRequest(http.MethodGet, "/go-admin/users?filter_status=active", nil)
+	activeReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(active, activeReq)
+	if !strings.Contains(active.Body.String(), "Jane Editor") || !strings.Contains(active.Body.String(), "active") {
+		t.Fatalf("expected bulk restored user to active: %s", active.Body.String())
+	}
+}
+
+func TestAdminUserSecurityActionsAndRuntimeDiagnostics(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/users?edit=admin", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(page, req)
+	if page.Code != http.StatusOK {
+		t.Fatalf("expected users security page, got %d: %s", page.Code, page.Body.String())
+	}
+	token := extractToken(t, page.Body.String())
+
+	createAppToken := httptest.NewRecorder()
+	appTokenForm := url.Values{
+		"action_token":           {token},
+		"id":                     {"admin"},
+		"security_action":        {"create_app_token"},
+		"app_token_name":         {"CLI"},
+		"app_token_ttl_hours":    {"24"},
+		"app_token_capabilities": {"content.read_private"},
+		"return_to":              {"/go-admin/users"},
+	}
+	appTokenReq := httptest.NewRequest(http.MethodPost, "/go-admin/users", strings.NewReader(appTokenForm.Encode()))
+	appTokenReq.Header.Set("Authorization", "Bearer admin-token")
+	appTokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(createAppToken, appTokenReq)
+	if createAppToken.Code != http.StatusOK {
+		t.Fatalf("expected app token result page, got %d: %s", createAppToken.Code, createAppToken.Body.String())
+	}
+	if !strings.Contains(createAppToken.Body.String(), "App token") || !strings.Contains(createAppToken.Body.String(), "copy-now") {
+		t.Fatalf("expected app token page to show one-time token: %s", createAppToken.Body.String())
+	}
+
+	createRecovery := httptest.NewRecorder()
+	recoveryForm := url.Values{
+		"action_token":        {token},
+		"id":                  {"admin"},
+		"security_action":     {"generate_recovery_codes"},
+		"recovery_code_count": {"2"},
+		"return_to":           {"/go-admin/users"},
+	}
+	recoveryReq := httptest.NewRequest(http.MethodPost, "/go-admin/users", strings.NewReader(recoveryForm.Encode()))
+	recoveryReq.Header.Set("Authorization", "Bearer admin-token")
+	recoveryReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(createRecovery, recoveryReq)
+	if createRecovery.Code != http.StatusOK {
+		t.Fatalf("expected recovery result page, got %d: %s", createRecovery.Code, createRecovery.Body.String())
+	}
+	if !strings.Contains(createRecovery.Body.String(), "Recovery code") {
+		t.Fatalf("expected recovery result page to list codes: %s", createRecovery.Body.String())
+	}
+
+	runtime := httptest.NewRecorder()
+	runtimeReq := httptest.NewRequest(http.MethodGet, "/go-admin/runtime", nil)
+	runtimeReq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(runtime, runtimeReq)
+	if runtime.Code != http.StatusOK {
+		t.Fatalf("expected runtime page, got %d: %s", runtime.Code, runtime.Body.String())
+	}
+	body := runtime.Body.String()
+	if !strings.Contains(body, "Health: Database connectivity") {
+		t.Fatalf("expected runtime page to include health rows: %s", body)
+	}
+	if !strings.Contains(body, "Audit: auth.app_token.create") || !strings.Contains(body, "Audit: auth.recovery_codes.generate") {
+		t.Fatalf("expected runtime page to include recent audit rows: %s", body)
 	}
 }
 
@@ -473,6 +767,7 @@ func TestAdminShowsRuntimeStatusFromResolvedProviders(t *testing.T) {
 	for _, expected := range []string{
 		`data-gocms-screen="runtime"`,
 		"Runtime status",
+		"Deployment profile",
 		"Content provider",
 		"json-import-export",
 		"Provider switch rule",
@@ -517,6 +812,46 @@ func TestAdminPolicyCanDisableDevBearer(t *testing.T) {
 	}
 }
 
+func TestExternalLoginPolicyDoesNotFallbackToFixtureLogin(t *testing.T) {
+	module, err := cms.NewWithOptions(cms.Options{
+		DataSource:      "file:" + strings.ReplaceAll(t.Name(), "/", "-") + "?mode=memory&cache=shared",
+		SessionKey:      "admin-test-session-secret",
+		SeedFixtures:    true,
+		RuntimeProfile:  string(runtimeprofile.RuntimeProfileFull),
+		StorageProfile:  string(runtimeprofile.StorageProfileSQLite),
+		EnableDevBearer: false,
+		LoginPolicy:     "external",
+		AdminPolicy:     "enabled",
+		Preset:          "full",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = module.Close(t.Context())
+	}()
+
+	mux := http.NewServeMux()
+	module.Routes(mux)
+	loginPage := httptest.NewRecorder()
+	mux.ServeHTTP(loginPage, httptest.NewRequest(http.MethodGet, "/go-login", nil))
+	token := extractToken(t, loginPage.Body.String())
+
+	form := url.Values{
+		"action_token": {token},
+		"email":        {"admin@example.test"},
+		"password":     {"admin"},
+		"return_to":    {"/go-admin"},
+	}
+	login := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/go-login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux.ServeHTTP(login, req)
+	if login.Code == http.StatusSeeOther {
+		t.Fatalf("external login policy must not accept fixture credentials")
+	}
+}
+
 func newAdminMux(t *testing.T) (*http.ServeMux, func()) {
 	t.Helper()
 	module, err := cms.New("file:"+strings.ReplaceAll(t.Name(), "/", "-")+"?mode=memory&cache=shared", "admin-test-session-secret", true)
@@ -537,6 +872,16 @@ func extractToken(t *testing.T, body string) string {
 		t.Fatalf("action token not found in body: %s", body)
 	}
 	return matches[len(matches)-1][1]
+}
+
+func extractTokenForAction(t *testing.T, body string, action string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(`data-gocms-action="` + regexp.QuoteMeta(action) + `".*?name="action_token"[^>]*value="([^"]+)"`)
+	match := pattern.FindStringSubmatch(strings.ReplaceAll(body, "\n", " "))
+	if len(match) < 2 {
+		t.Fatalf("action token for %q not found in body: %s", action, body)
+	}
+	return match[1]
 }
 
 func writeManifest(t *testing.T, manifest map[string]string) {

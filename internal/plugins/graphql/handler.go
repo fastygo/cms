@@ -32,9 +32,8 @@ type requestState struct {
 
 type requestStateKey struct{}
 
-func NewHandler(services Services, authenticator rest.Authenticator, settings Settings) (Handler, error) {
+func NewHandler(root *rootResolver, authenticator rest.Authenticator, settings Settings) (Handler, error) {
 	handler := Handler{auth: authenticator, settings: settings}
-	root := &rootResolver{services: services}
 	schema, err := graphql.ParseSchema(schema, root,
 		graphql.MaxDepth(settings.MaxDepth),
 		graphql.MaxParallelism(settings.MaxParallelism),

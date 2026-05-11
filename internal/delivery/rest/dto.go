@@ -1,9 +1,11 @@
 package rest
 
 import (
+	"context"
 	"net/http"
 	"time"
 
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
 	domainmedia "github.com/fastygo/cms/internal/domain/media"
@@ -11,6 +13,7 @@ import (
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/framework/pkg/web"
 )
 
@@ -103,17 +106,19 @@ type TermDTO struct {
 }
 
 type MediaDTO struct {
-	ID         string                `json:"id"`
-	Filename   string                `json:"filename"`
-	MimeType   string                `json:"mime_type"`
-	SizeBytes  int64                 `json:"size_bytes"`
-	Width      int                   `json:"width,omitempty"`
-	Height     int                   `json:"height,omitempty"`
-	AltText    string                `json:"alt_text,omitempty"`
-	Caption    string                `json:"caption,omitempty"`
-	PublicURL  string                `json:"public_url"`
-	PublicMeta map[string]any        `json:"metadata,omitempty"`
-	Variants   []domainmedia.Variant `json:"variants,omitempty"`
+	ID          string                `json:"id"`
+	Filename    string                `json:"filename"`
+	MimeType    string                `json:"mime_type"`
+	SizeBytes   int64                 `json:"size_bytes"`
+	Width       int                   `json:"width,omitempty"`
+	Height      int                   `json:"height,omitempty"`
+	AltText     string                `json:"alt_text,omitempty"`
+	Caption     string                `json:"caption,omitempty"`
+	PublicURL   string                `json:"public_url"`
+	Provider    string                `json:"provider,omitempty"`
+	ProviderURL string                `json:"provider_url,omitempty"`
+	PublicMeta  map[string]any        `json:"metadata,omitempty"`
+	Variants    []domainmedia.Variant `json:"variants,omitempty"`
 }
 
 type AuthorDTO struct {
@@ -156,11 +161,30 @@ func WriteError(w http.ResponseWriter, status int, code string, message string, 
 }
 
 func ContentProjection(entry domaincontent.Entry, includePrivate bool) ContentDTO {
-	metadata := make(map[string]any)
-	values := entry.Metadata
-	if !includePrivate {
-		values = entry.Metadata.Public()
+	projected, err := projectContent(context.Background(), nil, nil, entry, includePrivate, plugins.HookContext{})
+	if err != nil {
+		return baseContentProjection(entry, metadataValues(nil, entry, includePrivate))
 	}
+	return projected
+}
+
+func projectContent(ctx context.Context, registry *plugins.Registry, metaRegistry *appmeta.Registry, entry domaincontent.Entry, includePrivate bool, hookContext plugins.HookContext) (ContentDTO, error) {
+	dto := baseContentProjection(entry, metadataValues(metaRegistry, entry, includePrivate))
+	metadata, err := filterMetadata(ctx, registry, dto.Metadata, hookContext, metadataValues(metaRegistry, entry, includePrivate))
+	if err != nil {
+		return ContentDTO{}, err
+	}
+	dto.Metadata = metadata
+	filtered, err := plugins.FilterValue(ctx, registry, "rest.content.filter", hookContext, dto)
+	if err != nil {
+		return ContentDTO{}, err
+	}
+	filtered.Metadata = sanitizeContentMetadata(filtered.Metadata, metaRegistry, entry, includePrivate)
+	return filtered, nil
+}
+
+func baseContentProjection(entry domaincontent.Entry, values domaincontent.Metadata) ContentDTO {
+	metadata := make(map[string]any)
 	for key, value := range values {
 		metadata[key] = value.Value
 	}
@@ -187,6 +211,48 @@ func ContentProjection(entry domaincontent.Entry, includePrivate bool) ContentDT
 			"self": "/go-json/go/v2/" + string(entry.Kind) + "s/" + string(entry.ID),
 		},
 	}
+}
+
+func sanitizeContentMetadata(filtered map[string]any, metaRegistry *appmeta.Registry, entry domaincontent.Entry, includePrivate bool) map[string]any {
+	if len(filtered) == 0 {
+		return map[string]any{}
+	}
+	allowed := metadataValues(metaRegistry, entry, includePrivate)
+	result := make(map[string]any, len(filtered))
+	for key := range allowed {
+		value, ok := filtered[key]
+		if !ok {
+			continue
+		}
+		result[key] = value
+	}
+	return result
+}
+
+func metadataValues(metaRegistry *appmeta.Registry, entry domaincontent.Entry, includePrivate bool) domaincontent.Metadata {
+	if metaRegistry == nil {
+		if includePrivate {
+			return entry.Metadata
+		}
+		return entry.Metadata.Public()
+	}
+	return metaRegistry.PublicMetadata(entry.Kind, entry.Metadata, includePrivate)
+}
+
+func filterMetadata(ctx context.Context, registry *plugins.Registry, metadata map[string]any, hookContext plugins.HookContext, allowed domaincontent.Metadata) (map[string]any, error) {
+	filtered, err := plugins.FilterValue(ctx, registry, "content.metadata.public.filter", hookContext, metadata)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]any, len(filtered))
+	for key := range allowed {
+		value, ok := filtered[key]
+		if !ok {
+			continue
+		}
+		result[key] = value
+	}
+	return result, nil
 }
 
 func ContentTypeProjection(contentType domaincontenttype.Type) ContentTypeDTO {
@@ -231,17 +297,19 @@ func TermProjection(term domaintaxonomy.Term) TermDTO {
 
 func MediaProjection(asset domainmedia.Asset) MediaDTO {
 	return MediaDTO{
-		ID:         string(asset.ID),
-		Filename:   asset.Filename,
-		MimeType:   asset.MimeType,
-		SizeBytes:  asset.SizeBytes,
-		Width:      asset.Width,
-		Height:     asset.Height,
-		AltText:    asset.AltText,
-		Caption:    asset.Caption,
-		PublicURL:  asset.PublicURL,
-		PublicMeta: asset.PublicMeta,
-		Variants:   asset.Variants,
+		ID:          string(asset.ID),
+		Filename:    asset.Filename,
+		MimeType:    asset.MimeType,
+		SizeBytes:   asset.SizeBytes,
+		Width:       asset.Width,
+		Height:      asset.Height,
+		AltText:     asset.AltText,
+		Caption:     asset.Caption,
+		PublicURL:   asset.PublicURL,
+		Provider:    asset.ProviderRef.Provider,
+		ProviderURL: asset.ProviderRef.URL,
+		PublicMeta:  asset.PublicMeta,
+		Variants:    asset.Variants,
 	}
 }
 

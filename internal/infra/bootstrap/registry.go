@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	appaudit "github.com/fastygo/cms/internal/application/audit"
+	appauthn "github.com/fastygo/cms/internal/application/authn"
 	appcontent "github.com/fastygo/cms/internal/application/content"
 	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
+	appdiagnostics "github.com/fastygo/cms/internal/application/diagnostics"
 	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmenus "github.com/fastygo/cms/internal/application/menus"
 	appsettings "github.com/fastygo/cms/internal/application/settings"
@@ -23,6 +26,9 @@ type Store interface {
 	appcontent.Repository
 	appcontent.TypeRegistry
 	appcontenttype.Repository
+	appauthn.Repository
+	appaudit.Repository
+	appdiagnostics.Repository
 	apptaxonomy.Repository
 	apptaxonomy.EntryRepository
 	appmedia.Repository
@@ -44,13 +50,27 @@ type ProviderPlan struct {
 }
 
 type Runtime struct {
-	Store           Store
-	PluginState     plugins.StateRepository
-	SitePackage     jsondir.Provider
-	ContentProvider string
-	StorageProfile  string
-	DataSource      string
-	SitePackageDir  string
+	Store                Store
+	PluginState          plugins.StateRepository
+	SitePackage          jsondir.Provider
+	ContentProvider      string
+	ProviderCapabilities ProviderCapabilities
+	StorageProfile       string
+	DataSource           string
+	SitePackageDir       string
+}
+
+type ProviderCapabilities struct {
+	Durable             bool
+	Ephemeral           bool
+	BrowserLocal        bool
+	Transitional        bool
+	UsesSQLiteShim      bool
+	SupportsHealthCheck bool
+	SupportsSnapshots   bool
+	RequiresMigrations  bool
+	BlobStorageBoundary bool
+	Notes               []string
 }
 
 type Registry struct{}
@@ -65,14 +85,57 @@ func (Registry) Resolve(plan ProviderPlan) (Runtime, error) {
 		return Runtime{}, err
 	}
 	return Runtime{
-		Store:           store,
-		PluginState:     plugins.NewInMemoryStateRepository(),
-		SitePackage:     jsondir.Provider{Dir: plan.SitePackageDir},
-		ContentProvider: providerName,
-		StorageProfile:  plan.StorageProfile,
-		DataSource:      plan.DataSource,
-		SitePackageDir:  plan.SitePackageDir,
+		Store:                store,
+		PluginState:          plugins.NewInMemoryStateRepository(),
+		SitePackage:          jsondir.Provider{Dir: plan.SitePackageDir},
+		ContentProvider:      providerName,
+		ProviderCapabilities: providerCapabilities(plan.StorageProfile),
+		StorageProfile:       plan.StorageProfile,
+		DataSource:           plan.DataSource,
+		SitePackageDir:       plan.SitePackageDir,
 	}, nil
+}
+
+func providerCapabilities(storageProfile string) ProviderCapabilities {
+	switch storageProfile {
+	case string(runtimeprofile.StorageProfileBrowserIndexedDB):
+		return ProviderCapabilities{
+			Ephemeral:           true,
+			BrowserLocal:        true,
+			Transitional:        true,
+			UsesSQLiteShim:      true,
+			SupportsHealthCheck: true,
+			SupportsSnapshots:   true,
+			BlobStorageBoundary: true,
+			Notes: []string{
+				"browser-indexeddb currently resolves to an in-memory SQLite shim",
+				"future browser-local storage must use an IndexedDB/WASM provider boundary",
+			},
+		}
+	case string(runtimeprofile.StorageProfileMemory), string(runtimeprofile.StorageProfileJSONFixtures):
+		return ProviderCapabilities{
+			Ephemeral:           true,
+			SupportsHealthCheck: true,
+			SupportsSnapshots:   true,
+		}
+	case string(runtimeprofile.StorageProfileMySQL), string(runtimeprofile.StorageProfilePostgres), string(runtimeprofile.StorageProfileBbolt):
+		return ProviderCapabilities{
+			Durable:             true,
+			RequiresMigrations:  true,
+			BlobStorageBoundary: true,
+			Notes: []string{
+				"provider is declared but not implemented yet",
+			},
+		}
+	default:
+		return ProviderCapabilities{
+			Durable:             true,
+			SupportsHealthCheck: true,
+			SupportsSnapshots:   true,
+			RequiresMigrations:  true,
+			BlobStorageBoundary: true,
+		}
+	}
 }
 
 func openStore(storageProfile string, dataSource string) (Store, string, error) {

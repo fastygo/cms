@@ -7,7 +7,10 @@ const GOCMS_PLAYGROUND_SETTINGS_STORE = "settings";
 const GOCMS_PLAYGROUND_SNAPSHOT_KEY = "snapshot";
 const GOCMS_PLAYGROUND_SETTINGS_KEY_SOURCE = "settings-source";
 const GOCMS_PLAYGROUND_SETTINGS_KEY_IMPORTED_AT = "settings-imported-at";
+const GOCMS_PLAYGROUND_SETTINGS_KEY_LAUNCH = "settings-launch";
 const GOCMS_PLAYGROUND_POST_LIMIT = 10;
+const GOCMS_PLAYGROUND_BLUEPRINT_VERSION = "gocms.playground.blueprint.v1";
+const GOCMS_PLAYGROUND_LAUNCH_VERSION = "gocms.playground.launch.v1";
 
 const GOCMS_PLAYGROUND_SCHEMA = {
   snapshotVersion: "gocms.playground.v1",
@@ -17,6 +20,21 @@ const GOCMS_PLAYGROUND_SCHEMA = {
     "/wp-json/wp/v2/categories": [],
     "/wp-json/wp/v2/tags": [],
     "/wp-json/wp/v2/media": [],
+  },
+};
+
+const GOCMS_PLAYGROUND_LAUNCH_SCHEMA = {
+  blueprintVersion: GOCMS_PLAYGROUND_BLUEPRINT_VERSION,
+  launchVersion: GOCMS_PLAYGROUND_LAUNCH_VERSION,
+  query: {
+    source: "gocms",
+    snapshot: "gocms_snapshot",
+    blueprint: "gocms_blueprint",
+    route: "gocms_route",
+    theme: "gocms_theme",
+    preset: "gocms_preset",
+    demo: "gocms_demo",
+    embed: "gocms_embed",
   },
 };
 
@@ -55,6 +73,7 @@ function normalizeSnapshot(value) {
     snapshot_version: GOCMS_PLAYGROUND_SCHEMA.snapshotVersion,
     source,
     routes,
+    settings: Array.isArray(value.settings) ? value.settings : [],
     local: value.local || { media_blobs: "excluded" },
   };
 }
@@ -462,6 +481,7 @@ async function importFromSource(source, options = {}) {
     snapshot_version: GOCMS_PLAYGROUND_SCHEMA.snapshotVersion,
     source: { kind: "wp-json", base_url: base, imported_at: new Date().toISOString() },
     routes: snapshotRoutes,
+    settings: [],
     local: { media_blobs: "excluded" },
   };
   await saveSnapshot(snapshot);
@@ -489,6 +509,7 @@ async function exportToJson() {
       snapshot_version: GOCMS_PLAYGROUND_SCHEMA.snapshotVersion,
       source: { kind: "wp-json", base_url: "", imported_at: "" },
       routes: GOCMS_PLAYGROUND_SCHEMA.routes,
+      settings: [],
       local: { media_blobs: "excluded", media_metadata: mediaMetadata },
     };
   }
@@ -497,6 +518,7 @@ async function exportToJson() {
     snapshot_version: GOCMS_PLAYGROUND_SCHEMA.snapshotVersion,
     source: current.source || { kind: "wp-json", base_url: "", imported_at: "" },
     routes: current.routes || {},
+    settings: Array.isArray(current.settings) ? current.settings : [],
     local: { media_blobs: "excluded", media_metadata: mediaMetadata },
   };
 }
@@ -598,18 +620,67 @@ async function triggerPlaygroundReset() {
 
 async function bootstrapFromQuery() {
   const params = new URLSearchParams(window.location.search);
-  const source = params.get("gocms");
-  if (!source) {
+  const launch = launchOptionsFromQuery(params);
+  if (!launch.source_url && !launch.snapshot_url) {
     return;
   }
-  if (await hasSnapshot()) {
-    return;
+  const existingSnapshot = await hasSnapshot();
+  if (!existingSnapshot) {
+    if (launch.snapshot_url) {
+      await importFromSnapshotURL(launch.snapshot_url);
+    } else if (launch.source_url) {
+      const normalized = normalizeSource(launch.source_url);
+      if (!normalized) {
+        return;
+      }
+      await importFromSource(normalized);
+    }
   }
-  const normalized = normalizeSource(source);
-  if (!normalized) {
-    return;
+  await writeSetting(GOCMS_PLAYGROUND_SETTINGS_KEY_LAUNCH, JSON.stringify(launch));
+  if (launch.initial_path && window.location.pathname === "/go-admin") {
+    const next = new URL(launch.initial_path, window.location.origin);
+    if (launch.theme) {
+      next.searchParams.set("preview_theme", launch.theme);
+    }
+    if (launch.preset) {
+      next.searchParams.set("preview_preset", launch.preset);
+    }
+    if (String(next) !== String(window.location)) {
+      window.location.href = next.toString();
+    }
   }
-  await importFromSource(normalized);
+}
+
+async function importFromSnapshotURL(url) {
+  const response = await fetch(url, { headers: { "Accept": "application/json" } });
+  if (!response.ok) {
+    throw new Error("Unable to load " + url);
+  }
+  const payload = await response.json();
+  const snapshot = normalizeSnapshot(payload);
+  if (!snapshot) {
+    throw new Error("Invalid playground snapshot payload");
+  }
+  await saveSnapshot(snapshot);
+  return snapshot;
+}
+
+function launchOptionsFromQuery(params) {
+  return {
+    launch_version: GOCMS_PLAYGROUND_LAUNCH_SCHEMA.launchVersion,
+    source_url: params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.source) || "",
+    snapshot_url: params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.snapshot) || params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.blueprint) || "",
+    initial_path: params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.route) || "",
+    theme: params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.theme) || "",
+    preset: params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.preset) || "",
+    demo_mode: asBoolean(params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.demo)),
+    embedded: asBoolean(params.get(GOCMS_PLAYGROUND_LAUNCH_SCHEMA.query.embed)),
+  };
+}
+
+function asBoolean(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 if (typeof window !== "undefined") {
@@ -621,6 +692,8 @@ if (typeof window !== "undefined") {
     importFromSource,
     resetPlaygroundStorage,
     bootstrapFromQuery,
+    importFromSnapshotURL,
+    launchOptionsFromQuery,
     hasSnapshot,
     saveMediaBlob,
     mediaPlaceholder,
@@ -629,6 +702,8 @@ if (typeof window !== "undefined") {
     snapshotFromDB,
     readSetting,
     writeSetting,
+    schema: GOCMS_PLAYGROUND_SCHEMA,
+    launchSchema: GOCMS_PLAYGROUND_LAUNCH_SCHEMA,
   };
   if (window.location.pathname.startsWith("/go-admin")) {
     const start = async () => {

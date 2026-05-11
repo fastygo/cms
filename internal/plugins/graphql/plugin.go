@@ -9,6 +9,7 @@ import (
 	appcontenttype "github.com/fastygo/cms/internal/application/contenttype"
 	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmenus "github.com/fastygo/cms/internal/application/menus"
+	appmeta "github.com/fastygo/cms/internal/application/meta"
 	appsettings "github.com/fastygo/cms/internal/application/settings"
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
@@ -44,15 +45,17 @@ type Settings struct {
 type Plugin struct {
 	handler  Handler
 	settings Settings
+	resolver *rootResolver
 }
 
-func New(services Services, authenticator rest.Authenticator) (Plugin, error) {
+func New(services Services, authenticator rest.Authenticator, metaRegistry *appmeta.Registry) (Plugin, error) {
 	settings := defaultSettings()
-	handler, err := NewHandler(services, authenticator, settings)
+	resolver := &rootResolver{services: services, metaRegistry: metaRegistry}
+	handler, err := NewHandler(resolver, authenticator, settings)
 	if err != nil {
 		return Plugin{}, err
 	}
-	return Plugin{handler: handler, settings: settings}, nil
+	return Plugin{handler: handler, settings: settings, resolver: resolver}, nil
 }
 
 func defaultSettings() Settings {
@@ -95,9 +98,16 @@ func (p Plugin) Manifest() plugins.Manifest {
 
 func (p Plugin) Register(_ context.Context, registry *plugins.Registry) error {
 	manifest := p.Manifest()
+	if p.resolver != nil {
+		p.resolver.registry = registry
+	}
 	registry.AddCapabilities(manifest.Capabilities...)
 	registry.AddSettings(manifest.Settings...)
 	registry.AddHooks(manifest.Hooks...)
+	registry.AddActionHandlers(plugins.ActionHandlerRegistration{
+		Hook:   manifest.Hooks[0],
+		Handle: func(context.Context, plugins.HookContext, any) error { return nil },
+	})
 	registry.AddScreenActions(
 		plugins.ScreenActionRegistration{ScreenID: "headless", Build: p.actions},
 		plugins.ScreenActionRegistration{ScreenID: "runtime", Build: p.actions},

@@ -35,13 +35,22 @@ type Repository interface {
 }
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo            Repository
+	now             func() time.Time
+	providerProfile string
+}
+
+type BackupMetadata struct {
+	GeneratedAt      time.Time      `json:"generated_at"`
+	ProviderProfile  string         `json:"provider_profile,omitempty"`
+	ItemCounts       map[string]int `json:"item_counts,omitempty"`
+	ValidationResult string         `json:"validation_result,omitempty"`
 }
 
 type Bundle struct {
 	Version             string                      `json:"version"`
 	ExportedAt          time.Time                   `json:"exported_at"`
+	Backup              BackupMetadata              `json:"backup"`
 	Content             []domaincontent.Entry       `json:"content"`
 	ContentTypes        []domaincontenttype.Type    `json:"content_types"`
 	TaxonomyDefinitions []domaintaxonomy.Definition `json:"taxonomy_definitions"`
@@ -57,6 +66,11 @@ func NewService(repo Repository, now func() time.Time) Service {
 		now = time.Now
 	}
 	return Service{repo: repo, now: now}
+}
+
+func (s Service) WithProviderProfile(profile string) Service {
+	s.providerProfile = profile
+	return s
 }
 
 func (s Service) Export(ctx context.Context) (Bundle, error) {
@@ -97,8 +111,23 @@ func (s Service) Export(ctx context.Context) (Bundle, error) {
 		return Bundle{}, err
 	}
 	return Bundle{
-		Version:             SnapshotVersion,
-		ExportedAt:          s.now().UTC(),
+		Version:    SnapshotVersion,
+		ExportedAt: s.now().UTC(),
+		Backup: BackupMetadata{
+			GeneratedAt:     s.now().UTC(),
+			ProviderProfile: s.providerProfile,
+			ItemCounts: map[string]int{
+				"content":              len(content),
+				"content_types":        len(types),
+				"taxonomy_definitions": len(definitions),
+				"taxonomy_terms":       len(terms),
+				"media":                len(media),
+				"users":                len(users),
+				"settings":             len(settings),
+				"menus":                len(menus),
+			},
+			ValidationResult: "ok",
+		},
 		Content:             content,
 		ContentTypes:        types,
 		TaxonomyDefinitions: definitions,

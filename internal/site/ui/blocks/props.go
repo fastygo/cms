@@ -24,12 +24,13 @@ type LoginPanelData struct {
 }
 
 type ContentRow struct {
-	ID      string
-	Title   string
-	Slug    string
-	Status  string
-	Author  string
-	EditURL string
+	ID           string
+	Title        string
+	Slug         string
+	Status       string
+	Author       string
+	EditURL      string
+	QuickEditURL string
 }
 
 type ContentTableData struct {
@@ -40,6 +41,12 @@ type ContentTableData struct {
 	Pagination  elements.PaginationData
 	Headers     ContentTableHeaders
 	EditLabel   string
+	QuickLabel  string
+	Toolbar     *InlineFormData
+	QuickEdit   *InlineFormData
+	ScreenOpts  *InlineFormData
+	Bulk        *BulkActionData
+	Visible     map[string]bool
 }
 
 type ContentTableHeaders struct {
@@ -58,6 +65,25 @@ type PanelData struct {
 
 type EditorData struct {
 	ProviderID string
+}
+
+type InlineFormData struct {
+	Title       string
+	Description string
+	Action      string
+	Method      string
+	Token       string
+	Fields      []FieldData
+	SubmitLabel string
+	CancelLabel string
+	CancelHref  string
+}
+
+type BulkActionData struct {
+	Action      string
+	Token       string
+	Fields      []FieldData
+	SubmitLabel string
 }
 
 type FieldData struct {
@@ -91,10 +117,12 @@ type ContentEditorData struct {
 }
 
 type SimpleListRow struct {
-	Label       string
-	Description string
-	Status      string
-	ActionURL   string
+	ID           string
+	Label        string
+	Description  string
+	Status       string
+	ActionURL    string
+	QuickEditURL string
 }
 
 type SimpleListData struct {
@@ -109,6 +137,13 @@ type SimpleListData struct {
 	Headers     SimpleListHeaders
 	OpenLabel   string
 	SaveLabel   string
+	QuickLabel  string
+	Pagination  elements.PaginationData
+	Toolbar     *InlineFormData
+	QuickEdit   *InlineFormData
+	ScreenOpts  *InlineFormData
+	Bulk        *BulkActionData
+	Visible     map[string]bool
 }
 
 type SimpleListHeaders struct {

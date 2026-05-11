@@ -9,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	domainaudit "github.com/fastygo/cms/internal/domain/audit"
+	domainauthn "github.com/fastygo/cms/internal/domain/authn"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
+	domaindiagnostics "github.com/fastygo/cms/internal/domain/diagnostics"
 	domainmedia "github.com/fastygo/cms/internal/domain/media"
 	domainmenus "github.com/fastygo/cms/internal/domain/menus"
 	domainpreview "github.com/fastygo/cms/internal/domain/preview"
@@ -38,28 +41,7 @@ func Open(dataSource string) (*Store, error) {
 }
 
 func (s *Store) Init(ctx context.Context) error {
-	statements := []string{
-		`CREATE TABLE IF NOT EXISTS content_entries (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, author_id TEXT, entry_json TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS content_types (id TEXT PRIMARY KEY, type_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS taxonomy_definitions (type TEXT PRIMARY KEY, definition_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS taxonomy_terms (id TEXT PRIMARY KEY, type TEXT NOT NULL, term_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS media_assets (id TEXT PRIMARY KEY, asset_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, user_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, setting_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS menus (id TEXT PRIMARY KEY, location TEXT NOT NULL, menu_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS revisions (id TEXT PRIMARY KEY, entry_id TEXT NOT NULL, revision_json TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS preview_access (token TEXT PRIMARY KEY, access_json TEXT NOT NULL)`,
-		`CREATE INDEX IF NOT EXISTS idx_content_kind ON content_entries(kind)`,
-		`CREATE INDEX IF NOT EXISTS idx_content_status ON content_entries(status)`,
-		`CREATE INDEX IF NOT EXISTS idx_terms_type ON taxonomy_terms(type)`,
-		`CREATE INDEX IF NOT EXISTS idx_menus_location ON menus(location)`,
-	}
-	for _, statement := range statements {
-		if _, err := s.db.ExecContext(ctx, statement); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.applyMigrations(ctx)
 }
 
 func (s *Store) Close(context.Context) error {
@@ -384,6 +366,303 @@ func (s *Store) ListUsers(ctx context.Context) ([]domainusers.User, error) {
 			return nil, err
 		}
 		result = append(result, user)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveRecoveryCode(ctx context.Context, code domainauthn.RecoveryCode) error {
+	payload, err := encode(code)
+	if err != nil {
+		return err
+	}
+	var usedAt any
+	if code.UsedAt != nil {
+		usedAt = code.UsedAt.UTC().Format(time.RFC3339Nano)
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO auth_recovery_codes (id, user_id, used_at, recovery_json)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			user_id = excluded.user_id,
+			used_at = excluded.used_at,
+			recovery_json = excluded.recovery_json
+	`, code.ID, string(code.UserID), usedAt, payload)
+	return err
+}
+
+func (s *Store) ListRecoveryCodes(ctx context.Context, userID domainusers.ID) ([]domainauthn.RecoveryCode, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT recovery_json FROM auth_recovery_codes WHERE user_id = ? ORDER BY id`, string(userID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domainauthn.RecoveryCode{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var item domainauthn.RecoveryCode
+		if err := decode(payload, &item); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveResetToken(ctx context.Context, token domainauthn.ResetToken) error {
+	payload, err := encode(token)
+	if err != nil {
+		return err
+	}
+	var usedAt any
+	if token.UsedAt != nil {
+		usedAt = token.UsedAt.UTC().Format(time.RFC3339Nano)
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO auth_reset_tokens (id, user_id, expires_at, reset_json)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			user_id = excluded.user_id,
+			expires_at = excluded.expires_at,
+			reset_json = excluded.reset_json
+	`, token.ID, string(token.UserID), token.ExpiresAt.UTC().Format(time.RFC3339Nano), payload)
+	if err != nil {
+		return err
+	}
+	if usedAt == nil {
+		return nil
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE auth_reset_tokens SET reset_json = ? WHERE id = ?`, payload, token.ID)
+	return err
+}
+
+func (s *Store) GetResetToken(ctx context.Context, id string) (domainauthn.ResetToken, bool, error) {
+	var payload string
+	if err := s.db.QueryRowContext(ctx, `SELECT reset_json FROM auth_reset_tokens WHERE id = ?`, id).Scan(&payload); err != nil {
+		if err == sql.ErrNoRows {
+			return domainauthn.ResetToken{}, false, nil
+		}
+		return domainauthn.ResetToken{}, false, err
+	}
+	var token domainauthn.ResetToken
+	return token, true, decode(payload, &token)
+}
+
+func (s *Store) ListResetTokens(ctx context.Context, userID domainusers.ID) ([]domainauthn.ResetToken, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT reset_json FROM auth_reset_tokens WHERE user_id = ? ORDER BY expires_at DESC`, string(userID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domainauthn.ResetToken{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var item domainauthn.ResetToken
+		if err := decode(payload, &item); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveAppToken(ctx context.Context, token domainauthn.AppToken) error {
+	payload, err := encode(token)
+	if err != nil {
+		return err
+	}
+	var expiresAt any
+	if token.ExpiresAt != nil {
+		expiresAt = token.ExpiresAt.UTC().Format(time.RFC3339Nano)
+	}
+	var revokedAt any
+	if token.RevokedAt != nil {
+		revokedAt = token.RevokedAt.UTC().Format(time.RFC3339Nano)
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO auth_app_tokens (id, prefix, user_id, expires_at, revoked_at, token_json)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			prefix = excluded.prefix,
+			user_id = excluded.user_id,
+			expires_at = excluded.expires_at,
+			revoked_at = excluded.revoked_at,
+			token_json = excluded.token_json
+	`, token.ID, token.Prefix, string(token.UserID), expiresAt, revokedAt, payload)
+	return err
+}
+
+func (s *Store) GetAppTokenByPrefix(ctx context.Context, prefix string) (domainauthn.AppToken, bool, error) {
+	var payload string
+	if err := s.db.QueryRowContext(ctx, `SELECT token_json FROM auth_app_tokens WHERE prefix = ?`, prefix).Scan(&payload); err != nil {
+		if err == sql.ErrNoRows {
+			return domainauthn.AppToken{}, false, nil
+		}
+		return domainauthn.AppToken{}, false, err
+	}
+	var token domainauthn.AppToken
+	return token, true, decode(payload, &token)
+}
+
+func (s *Store) ListAppTokens(ctx context.Context, userID domainusers.ID) ([]domainauthn.AppToken, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT token_json FROM auth_app_tokens WHERE user_id = ? ORDER BY id`, string(userID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domainauthn.AppToken{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var token domainauthn.AppToken
+		if err := decode(payload, &token); err != nil {
+			return nil, err
+		}
+		result = append(result, token)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveLoginAttempt(ctx context.Context, attempt domainauthn.LoginAttempt) error {
+	payload, err := encode(attempt)
+	if err != nil {
+		return err
+	}
+	success := 0
+	if attempt.Success {
+		success = 1
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO auth_login_attempts (id, attempt_key, created_at, success, attempt_json)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			attempt_key = excluded.attempt_key,
+			created_at = excluded.created_at,
+			success = excluded.success,
+			attempt_json = excluded.attempt_json
+	`, attempt.ID, attempt.Key, attempt.CreatedAt.UTC().Format(time.RFC3339Nano), success, payload)
+	return err
+}
+
+func (s *Store) ListLoginAttempts(ctx context.Context, key string, since time.Time) ([]domainauthn.LoginAttempt, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT attempt_json FROM auth_login_attempts WHERE attempt_key = ? AND created_at >= ? ORDER BY created_at DESC`, key, since.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domainauthn.LoginAttempt{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var attempt domainauthn.LoginAttempt
+		if err := decode(payload, &attempt); err != nil {
+			return nil, err
+		}
+		result = append(result, attempt)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveAuditEvent(ctx context.Context, event domainaudit.Event) error {
+	payload, err := encode(event)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO audit_events (id, occurred_at, actor_id, action, resource, resource_id, event_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			occurred_at = excluded.occurred_at,
+			actor_id = excluded.actor_id,
+			action = excluded.action,
+			resource = excluded.resource,
+			resource_id = excluded.resource_id,
+			event_json = excluded.event_json
+	`, event.ID, event.OccurredAt.UTC().Format(time.RFC3339Nano), event.ActorID, event.Action, event.Resource, event.ResourceID, payload)
+	return err
+}
+
+func (s *Store) ListAuditEvents(ctx context.Context, limit int) ([]domainaudit.Event, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT event_json FROM audit_events ORDER BY occurred_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domainaudit.Event{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var event domainaudit.Event
+		if err := decode(payload, &event); err != nil {
+			return nil, err
+		}
+		result = append(result, event)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SaveErrorRecord(ctx context.Context, record domaindiagnostics.ErrorRecord) error {
+	payload, err := encode(record)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO error_logs (id, occurred_at, source, severity, error_json)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			occurred_at = excluded.occurred_at,
+			source = excluded.source,
+			severity = excluded.severity,
+			error_json = excluded.error_json
+	`, record.ID, record.OccurredAt.UTC().Format(time.RFC3339Nano), record.Source, record.Severity, payload)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+		DELETE FROM error_logs
+		WHERE id IN (
+			SELECT id FROM error_logs
+			ORDER BY occurred_at DESC
+			LIMIT -1 OFFSET 200
+		)
+	`)
+	return err
+}
+
+func (s *Store) ListErrorRecords(ctx context.Context, limit int) ([]domaindiagnostics.ErrorRecord, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT error_json FROM error_logs ORDER BY occurred_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []domaindiagnostics.ErrorRecord{}
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var record domaindiagnostics.ErrorRecord
+		if err := decode(payload, &record); err != nil {
+			return nil, err
+		}
+		result = append(result, record)
 	}
 	return result, rows.Err()
 }

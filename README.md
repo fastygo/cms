@@ -1,68 +1,112 @@
 # GoCMS
 
-GoCMS is a Go-native CMS implementation targeting the compatibility contract in `go-codex/en`.
+GoCMS is a Go-native CMS platform aligned with the compatibility contract in `go-codex/en`.
 
-This repository currently implements **Pass 0: Project Skeleton** only. It provides a runnable process, framework host wiring, health endpoints, structured logging setup, package boundaries, and a smoke test harness.
+The repository is now in an implemented operational state and includes both content management and hardening features, not only bootstrap scaffolding.
 
-## Documentation Layers
+## Architecture and Documentation Layers
 
-- `go-codex/en`: external compatibility contract.
-- `go-stack/en`: Go-native architecture profile.
-- `go-ui8kit/en`: UI8Kit admin profile.
-- `.project/implementation/en`: internal implementation roadmap and guardrails.
+- `go-codex/en`: external compatibility contract (public behavior, APIs, runtime modes, capabilities).
+- `go-stack/en`: internal Go architecture (modules, services, repositories, adapters, plugin runtime).
+- `go-ui8kit/en`: admin UI profile and runtime assets.
+- `.project/implementation/en`: implementation plan and progress notes.
 
-## What Exists In Pass 0
+## Current Feature Set (Pass 7+)
 
-- Go module: `github.com/fastygo/cms`.
-- Local framework replace: `github.com/fastygo/framework => ../@Framework`.
-- Composition root: `cmd/server`.
-- Runtime config wrapper: `internal/platform/config`.
-- Structured logging helper: `internal/platform/logging`.
-- Minimal system feature: `internal/infra/features/system`.
-- Reserved package boundaries for future domain, application, storage, delivery, and runtime layers.
+- Core CMS domains and services:
+  - Content types, taxonomies, content, revisions, media, menus, settings, users/authors.
+- REST control plane and admin shell:
+  - Admin routes (`/go-admin`, `/go-login`, `/go-logout` depending on profile).
+  - JSON API under `/go-json`.
+- Authentication and authorization hardening:
+  - Local password provider with Argon2id verification.
+  - Session policy and secure cookie handling.
+  - Login rate limiting and temporary lockout.
+  - Recovery codes and admin reset tokens.
+  - App/API tokens with scope, expiry, and revocation support.
+  - Capability-based RBAC (`admin`, `editor`, `viewer`) with action/resource checks.
+- Operational hardening:
+  - Versioned schema migrations with `schema_migrations` ledger.
+  - Health registry (`database`, `migrations`, `snapshot`, `authn`, `audit`, `error logs`).
+  - Snapshot-based backup and restore (site backup workflows).
+  - Audit logs for privileged admin/API actions with secret redaction.
+  - Bounded local error log storage (diagnostics for admin visibility).
+- Plugin and extension model:
+  - Runtime plugins for routes, capabilities, and settings.
+  - GraphQL plugin.
+  - JSON import/export plugin for backup/restore UX.
 
-## What Does Not Exist Yet
+## Storage and Profiles
 
-- CMS content model.
-- REST compatibility resources.
-- Admin GUI.
-- Storage layer.
-- GraphQL plugin.
-- Theme rendering.
-- Media handling.
-- Plugin runtime.
+GoCMS supports multiple storage profiles, including:
 
-## Run
+- `memory`
+- `sqlite`
+- `bbolt`
+- `mysql`
+- `postgres`
+- `json-fixtures`
+- `browser-indexeddb`
+
+Runtime profiles include:
+
+- `admin`
+- `headless`
+- `playground`
+- `full`
+- `conformance`
+
+## Getting Started
+
+Run locally:
 
 ```bash
 go run ./cmd/server
 ```
 
-Default health endpoints:
+Health checks:
 
 ```text
 /healthz
 /readyz
 ```
 
-Pass-0 system route:
+Admin + API entry points:
 
 ```text
-/
+/go-login
+/go-admin
+/go-json
 ```
 
-## Test
+Run tests:
 
 ```bash
 go test ./...
 ```
 
-## Format
+Format source:
 
 ```bash
 gofmt -w ./cmd ./internal
 ```
 
-## Next Pass
+## Documentation Map
 
-The next implementation pass is the Core Compatibility Kernel described in `.project/implementation/en/01-core-kernel.md`.
+- [CMS capability overview](./docs/cms-capabilities.md)
+- [Onboarding 101 (English/Russian guide in `docs/onboarding-101.md`)](./docs/onboarding-101.md)
+- [Authentication](./docs/authentication.md)
+- [Security model](./docs/security-model.md)
+- [Operations](./docs/operations.md)
+- [Migrations](./docs/migrations.md)
+- [Backup and restore](./docs/backup-restore.md)
+- [Health checks](./docs/health-checks.md)
+- [Audit logs](./docs/audit-logs.md)
+- [Error logs](./docs/error-logs.md)
+
+## Project History
+
+Current implementation progress is tracked in:
+
+- `.project/progress.md`
+- `.project/implementation/en`

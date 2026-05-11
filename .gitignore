@@ -3,7 +3,6 @@ dist/
 node_modules/
 .DS_Store
 .manual/
-.project/
 *.db
 *.db-shm
 *.db-wal

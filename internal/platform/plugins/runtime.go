@@ -74,12 +74,27 @@ type SettingDefinition struct {
 	Capability authz.Capability
 }
 
+type HookCategory string
+
+const (
+	HookCategoryAction HookCategory = "action"
+	HookCategoryFilter HookCategory = "filter"
+)
+
+type HookErrorPolicy string
+
+const (
+	HookErrorPolicyFail    HookErrorPolicy = "fail"
+	HookErrorPolicyCollect HookErrorPolicy = "collect"
+)
+
 type HookRegistration struct {
-	HookID    string
-	HandlerID string
-	OwnerID   string
-	Category  string
-	Priority  int
+	HookID      string
+	HandlerID   string
+	OwnerID     string
+	Category    HookCategory
+	Priority    int
+	ErrorPolicy HookErrorPolicy
 }
 
 type Asset = panel.Asset
@@ -93,18 +108,64 @@ type ScreenActionRegistration struct {
 type EditorProviderRegistration = panel.EditorProviderRegistration
 type Route = panel.Route[authz.Principal, authz.Capability]
 
+type HookContext struct {
+	HookID        string
+	Surface       Surface
+	Path          string
+	Locale        string
+	Principal     authz.Principal
+	Authenticated bool
+	Metadata      map[string]any
+}
+
+type ContentProjection struct {
+	Slug     map[string]string
+	Title    map[string]string
+	Content  map[string]string
+	Excerpt  map[string]string
+	Metadata map[string]any
+}
+
+type ActionHandler func(context.Context, HookContext, any) error
+type FilterHandler func(context.Context, HookContext, any) (any, error)
+
+type ActionHandlerRegistration struct {
+	Hook   HookRegistration
+	Handle ActionHandler
+}
+
+type FilterHandlerRegistration struct {
+	Hook   HookRegistration
+	Handle FilterHandler
+}
+
+type registeredActionHandler struct {
+	ActionHandlerRegistration
+	order int
+}
+
+type registeredFilterHandler struct {
+	FilterHandlerRegistration
+	order int
+}
+
 type Registry struct {
 	panel         *panel.Registry[authz.Principal, authz.Capability]
 	screenActions map[string][]ScreenActionRegistration
 	capabilities  []CapabilityDefinition
 	settings      []SettingDefinition
 	hooks         []HookRegistration
+	actionHooks   map[string][]registeredActionHandler
+	filterHooks   map[string][]registeredFilterHandler
+	hookOrder     int
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
 		panel:         panel.NewRegistry[authz.Principal, authz.Capability](),
 		screenActions: map[string][]ScreenActionRegistration{},
+		actionHooks:   map[string][]registeredActionHandler{},
+		filterHooks:   map[string][]registeredFilterHandler{},
 	}
 }
 
@@ -139,7 +200,40 @@ func (r *Registry) AddSettings(settings ...SettingDefinition) {
 }
 
 func (r *Registry) AddHooks(hooks ...HookRegistration) {
-	r.hooks = append(r.hooks, hooks...)
+	for _, hook := range hooks {
+		hook.Category = normalizeHookCategory(hook.Category, HookCategoryAction)
+		hook.Priority = normalizeHookPriority(hook.Priority)
+		hook.ErrorPolicy = normalizeHookErrorPolicy(hook.ErrorPolicy)
+		r.registerHook(hook)
+	}
+}
+
+func (r *Registry) AddActionHandlers(registrations ...ActionHandlerRegistration) {
+	for _, registration := range registrations {
+		registration.Hook.Category = normalizeHookCategory(registration.Hook.Category, HookCategoryAction)
+		registration.Hook.Priority = normalizeHookPriority(registration.Hook.Priority)
+		registration.Hook.ErrorPolicy = normalizeHookErrorPolicy(registration.Hook.ErrorPolicy)
+		r.registerHook(registration.Hook)
+		r.actionHooks[registration.Hook.HookID] = append(r.actionHooks[registration.Hook.HookID], registeredActionHandler{
+			ActionHandlerRegistration: registration,
+			order:                     r.hookOrder,
+		})
+		r.hookOrder++
+	}
+}
+
+func (r *Registry) AddFilterHandlers(registrations ...FilterHandlerRegistration) {
+	for _, registration := range registrations {
+		registration.Hook.Category = normalizeHookCategory(registration.Hook.Category, HookCategoryFilter)
+		registration.Hook.Priority = normalizeHookPriority(registration.Hook.Priority)
+		registration.Hook.ErrorPolicy = normalizeHookErrorPolicy(registration.Hook.ErrorPolicy)
+		r.registerHook(registration.Hook)
+		r.filterHooks[registration.Hook.HookID] = append(r.filterHooks[registration.Hook.HookID], registeredFilterHandler{
+			FilterHandlerRegistration: registration,
+			order:                     r.hookOrder,
+		})
+		r.hookOrder++
+	}
 }
 
 func (r *Registry) AdminMenu(principal authz.Principal) []app.NavItem {
@@ -190,6 +284,83 @@ func (r *Registry) Settings() []SettingDefinition {
 
 func (r *Registry) Hooks() []HookRegistration {
 	return append([]HookRegistration(nil), r.hooks...)
+}
+
+func (r *Registry) DispatchAction(ctx context.Context, hookID string, hookContext HookContext, payload any) error {
+	if r == nil {
+		return nil
+	}
+	hookContext.HookID = hookID
+	handlers := append([]registeredActionHandler(nil), r.actionHooks[hookID]...)
+	slices.SortFunc(handlers, compareActionHandlers)
+	failures := make([]string, 0)
+	for _, handler := range handlers {
+		if handler.Handle == nil {
+			continue
+		}
+		if err := handler.Handle(ctx, hookContext, payload); err != nil {
+			switch handler.Hook.ErrorPolicy {
+			case HookErrorPolicyCollect:
+				failures = append(failures, fmt.Sprintf("%s: %v", handler.Hook.HandlerID, err))
+			default:
+				return fmt.Errorf("action hook %q handler %q failed: %w", hookID, handler.Hook.HandlerID, err)
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("action hook %q failed: %s", hookID, strings.Join(failures, "; "))
+	}
+	return nil
+}
+
+func (r *Registry) ApplyFilter(ctx context.Context, hookID string, hookContext HookContext, value any) (any, error) {
+	if r == nil {
+		return value, nil
+	}
+	hookContext.HookID = hookID
+	current := value
+	handlers := append([]registeredFilterHandler(nil), r.filterHooks[hookID]...)
+	slices.SortFunc(handlers, compareFilterHandlers)
+	failures := make([]string, 0)
+	for _, handler := range handlers {
+		if handler.Handle == nil {
+			continue
+		}
+		next, err := handler.Handle(ctx, hookContext, current)
+		if err != nil {
+			switch handler.Hook.ErrorPolicy {
+			case HookErrorPolicyCollect:
+				failures = append(failures, fmt.Sprintf("%s: %v", handler.Hook.HandlerID, err))
+				continue
+			default:
+				return current, fmt.Errorf("filter hook %q handler %q failed: %w", hookID, handler.Hook.HandlerID, err)
+			}
+		}
+		current = next
+	}
+	if len(failures) > 0 {
+		return current, fmt.Errorf("filter hook %q failed: %s", hookID, strings.Join(failures, "; "))
+	}
+	return current, nil
+}
+
+func FilterValue[T any](ctx context.Context, registry *Registry, hookID string, hookContext HookContext, value T) (T, error) {
+	var zero T
+	if registry == nil {
+		return value, nil
+	}
+	raw, err := registry.ApplyFilter(ctx, hookID, hookContext, value)
+	if err != nil {
+		return zero, err
+	}
+	if raw == nil {
+		return zero, fmt.Errorf("filter hook %q returned <nil>", hookID)
+	}
+	typed, ok := raw.(T)
+	if !ok {
+		return zero, fmt.Errorf("filter hook %q returned %T", hookID, raw)
+	}
+	return typed, nil
 }
 
 type StateRecord struct {
@@ -269,6 +440,20 @@ func (r *Runtime) Activate(ctx context.Context, active []string) (*Registry, err
 		if existing, ok := records[id]; ok {
 			record = existing
 		}
+		if err := registry.DispatchAction(ctx, "plugin.activate.before", HookContext{
+			Metadata: map[string]any{
+				"plugin_id":      manifest.ID,
+				"plugin_version": manifest.Version,
+			},
+		}, map[string]any{
+			"plugin_id":      manifest.ID,
+			"plugin_version": manifest.Version,
+		}); err != nil {
+			record.State = StateFailed
+			record.LastError = err.Error()
+			_ = r.state.Save(ctx, record)
+			return nil, err
+		}
 		if err := descriptor.Register(ctx, registry); err != nil {
 			record.State = StateFailed
 			record.LastError = err.Error()
@@ -278,6 +463,20 @@ func (r *Runtime) Activate(ctx context.Context, active []string) (*Registry, err
 		record.State = StateActive
 		record.LastError = ""
 		if err := r.state.Save(ctx, record); err != nil {
+			return nil, err
+		}
+		if err := registry.DispatchAction(ctx, "plugin.activate.after", HookContext{
+			Metadata: map[string]any{
+				"plugin_id":      manifest.ID,
+				"plugin_version": manifest.Version,
+			},
+		}, map[string]any{
+			"plugin_id":      manifest.ID,
+			"plugin_version": manifest.Version,
+		}); err != nil {
+			record.State = StateFailed
+			record.LastError = err.Error()
+			_ = r.state.Save(ctx, record)
 			return nil, err
 		}
 	}
@@ -294,20 +493,94 @@ func (r *Runtime) Activate(ctx context.Context, active []string) (*Registry, err
 }
 
 func (r *Runtime) Deactivate(ctx context.Context, ids []string) error {
+	records, err := r.state.Load(ctx)
+	if err != nil {
+		return err
+	}
+	registry := NewRegistry()
+	for _, record := range records {
+		if record.State != StateActive {
+			continue
+		}
+		descriptor, ok := r.descriptors[record.ID]
+		if !ok {
+			continue
+		}
+		if err := descriptor.Register(ctx, registry); err != nil {
+			return err
+		}
+	}
 	for _, id := range ids {
 		descriptor, ok := r.descriptors[id]
 		if !ok {
 			return fmt.Errorf("plugin %q is not compiled into this binary", id)
 		}
+		manifest := descriptor.Manifest()
+		payload := map[string]any{
+			"plugin_id":      manifest.ID,
+			"plugin_version": manifest.Version,
+		}
+		if err := registry.DispatchAction(ctx, "plugin.deactivate.before", HookContext{Metadata: payload}, payload); err != nil {
+			return err
+		}
 		if err := r.state.Save(ctx, StateRecord{
 			ID:      id,
-			Version: descriptor.Manifest().Version,
+			Version: manifest.Version,
 			State:   StateInactive,
 		}); err != nil {
 			return err
 		}
+		if err := registry.DispatchAction(ctx, "plugin.deactivate.after", HookContext{Metadata: payload}, payload); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func compareActionHandlers(left registeredActionHandler, right registeredActionHandler) int {
+	if left.Hook.Priority != right.Hook.Priority {
+		return left.Hook.Priority - right.Hook.Priority
+	}
+	return left.order - right.order
+}
+
+func compareFilterHandlers(left registeredFilterHandler, right registeredFilterHandler) int {
+	if left.Hook.Priority != right.Hook.Priority {
+		return left.Hook.Priority - right.Hook.Priority
+	}
+	return left.order - right.order
+}
+
+func normalizeHookCategory(value HookCategory, fallback HookCategory) HookCategory {
+	if strings.TrimSpace(string(value)) == "" {
+		return fallback
+	}
+	return value
+}
+
+func normalizeHookPriority(value int) int {
+	if value == 0 {
+		return 100
+	}
+	return value
+}
+
+func normalizeHookErrorPolicy(value HookErrorPolicy) HookErrorPolicy {
+	switch value {
+	case HookErrorPolicyCollect:
+		return value
+	default:
+		return HookErrorPolicyFail
+	}
+}
+
+func (r *Registry) registerHook(hook HookRegistration) {
+	for _, existing := range r.hooks {
+		if existing.HookID == hook.HookID && existing.HandlerID == hook.HandlerID && existing.OwnerID == hook.OwnerID {
+			return
+		}
+	}
+	r.hooks = append(r.hooks, hook)
 }
 
 func validPluginID(value string) bool {

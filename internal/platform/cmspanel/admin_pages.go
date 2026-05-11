@@ -251,11 +251,14 @@ func simpleTable(id string, nameLabel string, descriptionLabel string, statusLab
 	return panel.TableSchema[authz.Capability]{
 		ID: id + "-list",
 		Columns: []panel.Column{
-			{ID: "name", Label: nameLabel, Type: panel.ColumnText, Searchable: true, Sortable: true},
-			{ID: "description", Label: descriptionLabel, Type: panel.ColumnText, Searchable: true},
-			{ID: "status", Label: statusLabel, Type: panel.ColumnBadge, Sortable: true},
+			{ID: "name", Label: nameLabel, Type: panel.ColumnText, Searchable: true, Sortable: true, Toggleable: true},
+			{ID: "description", Label: descriptionLabel, Type: panel.ColumnText, Searchable: true, Sortable: true, Toggleable: true},
+			{ID: "status", Label: statusLabel, Type: panel.ColumnBadge, Sortable: true, Toggleable: true},
 		},
-		Searchable: true,
+		Filters:     []panel.Filter{{ID: "status", Label: statusLabel, Type: panel.FilterText}},
+		DefaultSort: panel.Sort{ColumnID: "name", Direction: panel.SortAsc},
+		Searchable:  true,
+		PerPage:     []int{25, 50, 100},
 	}
 }
 

@@ -20,7 +20,16 @@ func TestMediaMetadataAndFeaturedAttachment(t *testing.T) {
 	service := appmedia.NewService(mediaRepo, entryRepo)
 	editor := authz.NewPrincipal("editor-1", authz.CapabilityMediaEdit)
 
-	asset := domainmedia.Asset{ID: "asset-1", Filename: "cover.jpg", MimeType: "image/jpeg", PublicURL: "/media/cover.jpg"}
+	asset := domainmedia.Asset{
+		ID:        "asset-1",
+		Filename:  "cover.jpg",
+		MimeType:  "image/jpeg",
+		PublicURL: "/media/cover.jpg",
+		ProviderRef: domainmedia.BlobRef{
+			Provider: "fixtures",
+			Key:      "media/cover.jpg",
+		},
+	}
 	if err := service.SaveMetadata(ctx, editor, asset); err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +39,53 @@ func TestMediaMetadataAndFeaturedAttachment(t *testing.T) {
 	}
 	if entry.FeaturedMediaID != "asset-1" {
 		t.Fatalf("expected featured media asset, got %q", entry.FeaturedMediaID)
+	}
+}
+
+func TestMediaSaveMetadataValidatesProviderRefsAndURLs(t *testing.T) {
+	ctx := context.Background()
+	mediaRepo := &memoryMediaRepo{assets: make(map[domainmedia.ID]domainmedia.Asset)}
+	service := appmedia.NewService(mediaRepo, &memoryEntryRepo{})
+	editor := authz.NewPrincipal("editor-1", authz.CapabilityMediaEdit)
+
+	err := service.SaveMetadata(ctx, editor, domainmedia.Asset{
+		ID:        "asset-invalid",
+		Filename:  "cover.txt",
+		MimeType:  "text/plain",
+		PublicURL: "https://cdn.example.test/cover.txt",
+	})
+	if err == nil {
+		t.Fatal("expected mime validation error")
+	}
+
+	err = service.SaveMetadata(ctx, editor, domainmedia.Asset{
+		ID:        "asset-provider-invalid",
+		Filename:  "cover.webp",
+		MimeType:  "image/webp",
+		PublicURL: "https://cdn.example.test/cover.webp",
+		ProviderRef: domainmedia.BlobRef{
+			Key: "media/originals/cover.webp",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected provider validation error")
+	}
+
+	err = service.SaveMetadata(ctx, editor, domainmedia.Asset{
+		ID:        "asset-valid",
+		Filename:  "cover.webp",
+		MimeType:  "image/webp",
+		PublicURL: "https://cdn.example.test/cover.webp",
+		Width:     1024,
+		Height:    512,
+		ProviderRef: domainmedia.BlobRef{
+			Provider: "s3",
+			Key:      "media/originals/cover.webp",
+			URL:      "https://bucket.example.test/cover.webp",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

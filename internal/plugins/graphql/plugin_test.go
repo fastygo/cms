@@ -2,6 +2,7 @@ package graphqlplugin_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	domaincontent "github.com/fastygo/cms/internal/domain/content"
+	domainmeta "github.com/fastygo/cms/internal/domain/meta"
 	"github.com/fastygo/cms/internal/infra/features/cms"
+	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 )
 
 type graphQLResponse struct {
@@ -181,11 +185,17 @@ func TestGraphQLReadCoverageAndPublicVisibility(t *testing.T) {
 		t.Fatal("expected menus")
 	}
 	settings := mustSlice(t, response.Data["settings"])
-	if len(settings) != 1 {
-		t.Fatalf("expected only public settings, got %+v", settings)
+	keys := map[string]struct{}{}
+	for _, item := range settings {
+		keys[mustString(t, mustMap(t, item)["key"])] = struct{}{}
 	}
-	if got := mustString(t, mustMap(t, settings[0])["key"]); got != "site.title" {
-		t.Fatalf("unexpected public setting key = %q", got)
+	for _, expected := range []string{"site.title", "public.rendering", "theme.brand_name", "theme.home_intro"} {
+		if _, ok := keys[expected]; !ok {
+			t.Fatalf("expected public setting %q, got %+v", expected, settings)
+		}
+	}
+	if _, ok := keys["site.private_note"]; ok {
+		t.Fatalf("private setting leaked: %+v", settings)
 	}
 	search := mustMap(t, response.Data["search"])
 	if got := mustInt(t, mustMap(t, search["pagination"])["total"]); got != 1 {
@@ -312,6 +322,82 @@ func TestGraphQLMatchesRESTProjectionForPublishedPost(t *testing.T) {
 	}
 }
 
+func TestGraphQLMatchesRESTForRegisteredPublicMetadata(t *testing.T) {
+	module, err := cms.NewWithOptions(cms.Options{
+		DataSource:      "file:graphql-meta-projection?mode=memory&cache=shared",
+		SessionKey:      "test-session-secret-test-session-secret",
+		SeedFixtures:    true,
+		RuntimeProfile:  "full",
+		StorageProfile:  "sqlite",
+		ActivePlugins:   []string{"graphql"},
+		EnableDevBearer: true,
+		LoginPolicy:     "fixture",
+		AdminPolicy:     "enabled",
+		Preset:          "test",
+		ExtraMeta: []domainmeta.Definition{{
+			Key:    "secret_token",
+			Label:  "Secret token",
+			Owner:  "test",
+			Scope:  domainmeta.ScopeContent,
+			Kinds:  []domaincontent.Kind{domaincontent.KindPost},
+			Type:   domainmeta.ValueTypeString,
+			Public: false,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := module.Close(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	mux := http.NewServeMux()
+	module.Routes(mux)
+
+	create := request(mux, http.MethodPost, "/go-json/go/v2/posts", `{"title":{"en":"Projection Post"},"slug":{"en":"projection-post"},"content":{"en":"Body"},"status":"published","metadata":{"seo_title":"Projection Title","secret_token":"top-secret"}}`, "Bearer admin-token")
+	if create.Code != http.StatusCreated {
+		t.Fatalf("create status = %d body = %s", create.Code, create.Body.String())
+	}
+
+	restRec := request(mux, http.MethodGet, "/go-json/go/v2/posts/by-slug/projection-post", "", "")
+	if restRec.Code != http.StatusOK {
+		t.Fatalf("rest status = %d body = %s", restRec.Code, restRec.Body.String())
+	}
+	var restEnvelope struct {
+		Data struct {
+			Metadata map[string]any `json:"metadata"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(restRec.Body.Bytes(), &restEnvelope); err != nil {
+		t.Fatal(err)
+	}
+
+	graphRec := graphQLRequest(mux, `query { post(slug: "projection-post") { metadata } }`, "")
+	if graphRec.Code != http.StatusOK {
+		t.Fatalf("graphql status = %d body = %s", graphRec.Code, graphRec.Body.String())
+	}
+	response := decodeGraphQL(t, graphRec)
+	if len(response.Errors) > 0 {
+		t.Fatalf("unexpected graphql errors: %+v", response.Errors)
+	}
+	post := mustMap(t, response.Data["post"])
+	graphMeta := mustMap(t, post["metadata"])
+
+	if got := restEnvelope.Data.Metadata["seo_title"]; got != "Projection Title" {
+		t.Fatalf("rest seo_title = %v", got)
+	}
+	if got := graphMeta["seo_title"]; got != "Projection Title" {
+		t.Fatalf("graphql seo_title = %v", got)
+	}
+	if _, ok := restEnvelope.Data.Metadata["secret_token"]; ok {
+		t.Fatalf("rest leaked private meta: %+v", restEnvelope.Data.Metadata)
+	}
+	if _, ok := graphMeta["secret_token"]; ok {
+		t.Fatalf("graphql leaked private meta: %+v", graphMeta)
+	}
+}
+
 func TestGraphQLStatusAppearsInAdminSurfaces(t *testing.T) {
 	mux := newMux(t, []string{"graphql"})
 
@@ -339,19 +425,78 @@ func TestGraphQLStatusAppearsInAdminSurfaces(t *testing.T) {
 	}
 }
 
+func TestGraphQLProjectionFilterRemainsAuthorizationSafe(t *testing.T) {
+	descriptor := graphqlTestDescriptor{
+		manifest: platformplugins.Manifest{
+			ID:          "graphql-filter",
+			Name:        "GraphQL Filter",
+			Version:     "1.0.0",
+			Contract:    "0.1",
+			Description: "Filters GraphQL content projections.",
+			Hooks: []platformplugins.HookRegistration{
+				{HookID: "graphql.content.filter", HandlerID: "graphql-filter.content", OwnerID: "graphql-filter", Category: platformplugins.HookCategoryFilter},
+			},
+		},
+		register: func(_ context.Context, registry *platformplugins.Registry) error {
+			hook := platformplugins.HookRegistration{HookID: "graphql.content.filter", HandlerID: "graphql-filter.content", OwnerID: "graphql-filter", Category: platformplugins.HookCategoryFilter}
+			registry.AddHooks(hook)
+			registry.AddFilterHandlers(platformplugins.FilterHandlerRegistration{
+				Hook: hook,
+				Handle: func(_ context.Context, _ platformplugins.HookContext, value any) (any, error) {
+					projection := value.(platformplugins.ContentProjection)
+					projection.Title["en"] = "[filtered] " + projection.Title["en"]
+					projection.Metadata["private_key"] = "leak"
+					return projection, nil
+				},
+			})
+			return nil
+		},
+	}
+	mux := newMuxWithDescriptors(t, []string{"graphql", "graphql-filter"}, []platformplugins.Descriptor{descriptor})
+	rec := graphQLRequest(mux, `
+		query {
+			post(slug: "published-post") {
+				title
+				metadata
+			}
+		}
+	`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("graphql status = %d body = %s", rec.Code, rec.Body.String())
+	}
+	response := decodeGraphQL(t, rec)
+	if len(response.Errors) > 0 {
+		t.Fatalf("unexpected graphql errors: %+v", response.Errors)
+	}
+	post := mustMap(t, response.Data["post"])
+	title := mustMap(t, post["title"])
+	if got := mustString(t, title["en"]); got != "[filtered] Published Post" {
+		t.Fatalf("filtered title = %q", got)
+	}
+	metadata := mustMap(t, post["metadata"])
+	if _, ok := metadata["private_key"]; ok {
+		t.Fatalf("private metadata leaked: %+v", metadata)
+	}
+}
+
 func newMux(t *testing.T, activePlugins []string) *http.ServeMux {
+	return newMuxWithDescriptors(t, activePlugins, nil)
+}
+
+func newMuxWithDescriptors(t *testing.T, activePlugins []string, descriptors []platformplugins.Descriptor) *http.ServeMux {
 	t.Helper()
 	module, err := cms.NewWithOptions(cms.Options{
-		DataSource:      fmt.Sprintf("file:%s?mode=memory&cache=shared", sanitizeName(t.Name())),
-		SessionKey:      "test-session-secret-test-session-secret",
-		SeedFixtures:    true,
-		RuntimeProfile:  "full",
-		StorageProfile:  "sqlite",
-		ActivePlugins:   activePlugins,
-		EnableDevBearer: true,
-		LoginPolicy:     "fixture",
-		AdminPolicy:     "enabled",
-		Preset:          "test",
+		DataSource:       fmt.Sprintf("file:%s?mode=memory&cache=shared", sanitizeName(t.Name())),
+		SessionKey:       "test-session-secret-test-session-secret",
+		SeedFixtures:     true,
+		RuntimeProfile:   "full",
+		StorageProfile:   "sqlite",
+		ActivePlugins:    activePlugins,
+		EnableDevBearer:  true,
+		LoginPolicy:      "fixture",
+		AdminPolicy:      "enabled",
+		Preset:           "test",
+		ExtraDescriptors: descriptors,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -441,4 +586,20 @@ func mustInt(t *testing.T, value any) int {
 		t.Fatalf("expected number, got %T", value)
 	}
 	return int(number)
+}
+
+type graphqlTestDescriptor struct {
+	manifest platformplugins.Manifest
+	register func(context.Context, *platformplugins.Registry) error
+}
+
+func (d graphqlTestDescriptor) Manifest() platformplugins.Manifest {
+	return d.manifest
+}
+
+func (d graphqlTestDescriptor) Register(ctx context.Context, registry *platformplugins.Registry) error {
+	if d.register == nil {
+		return nil
+	}
+	return d.register(ctx, registry)
 }

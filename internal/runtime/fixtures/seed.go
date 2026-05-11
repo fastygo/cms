@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	appauthn "github.com/fastygo/cms/internal/application/authn"
+	"github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domaincontenttype "github.com/fastygo/cms/internal/domain/contenttype"
 	domainmedia "github.com/fastygo/cms/internal/domain/media"
@@ -28,6 +30,19 @@ func Seed(ctx context.Context, store Store) error {
 	now := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 	future := now.Add(24 * time.Hour)
 	published := now.Add(-24 * time.Hour)
+	hasher := appauthn.DefaultPasswordHasher()
+	adminHash, err := hasher.Hash("admin")
+	if err != nil {
+		return err
+	}
+	editorHash, err := hasher.Hash("editor")
+	if err != nil {
+		return err
+	}
+	viewerHash, err := hasher.Hash("viewer")
+	if err != nil {
+		return err
+	}
 
 	for _, contentType := range []domaincontenttype.Type{
 		domaincontenttype.BuiltInPost(),
@@ -68,13 +83,53 @@ func Seed(ctx context.Context, store Store) error {
 		}
 	}
 
+	passwordUpdatedAt := now
+	for _, user := range []domainusers.User{
+		{
+			ID:                "admin",
+			Login:             "admin",
+			DisplayName:       "Admin",
+			Email:             "admin@example.test",
+			Status:            domainusers.StatusActive,
+			Roles:             []string{authz.RoleAdmin},
+			PasswordHash:      adminHash,
+			PasswordUpdatedAt: &passwordUpdatedAt,
+		},
+		{
+			ID:                "author-1",
+			Login:             "jane",
+			DisplayName:       "Jane Editor",
+			Email:             "jane@example.test",
+			Status:            domainusers.StatusActive,
+			Roles:             []string{authz.RoleEditor},
+			Profile:           domainusers.AuthorProfile{Slug: "jane", Bio: "Fixture editor", AvatarURL: "/media/avatar-jane.png"},
+			PasswordHash:      editorHash,
+			PasswordUpdatedAt: &passwordUpdatedAt,
+		},
+		{
+			ID:                "viewer",
+			Login:             "viewer",
+			DisplayName:       "Viewer",
+			Email:             "viewer@example.test",
+			Status:            domainusers.StatusActive,
+			Roles:             []string{authz.RoleViewer},
+			PasswordHash:      viewerHash,
+			PasswordUpdatedAt: &passwordUpdatedAt,
+		},
+	} {
+		if err := store.SaveUser(ctx, user); err != nil {
+			return err
+		}
+	}
 	if err := store.SaveUser(ctx, domainusers.User{
-		ID:          "author-1",
-		Login:       "jane",
-		DisplayName: "Jane Editor",
-		Email:       "jane@example.test",
-		Status:      domainusers.StatusActive,
-		Profile:     domainusers.AuthorProfile{Slug: "jane", Bio: "Fixture editor", AvatarURL: "/media/avatar-jane.png"},
+		ID:                "legacy-editor",
+		Login:             "editor",
+		DisplayName:       "Editor",
+		Email:             "editor@example.test",
+		Status:            domainusers.StatusActive,
+		Roles:             []string{authz.RoleEditor},
+		PasswordHash:      editorHash,
+		PasswordUpdatedAt: &passwordUpdatedAt,
 	}); err != nil {
 		return err
 	}
