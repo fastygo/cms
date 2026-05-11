@@ -7,7 +7,7 @@
 @source "../../../web/src/**/*.js";
 
 /*@import "./tokens.css";*/
-@import "./fonts.css";
+@import "./gfonts.css";
 @import "./tweakcn.css";
 @import "./ui8kit/shell.css";
 @import "./ui8kit/components.css";

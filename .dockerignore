@@ -1,11 +1,15 @@
 .git
 .gitignore
+.env
+.env.*
 .manual
 .project
 .ui8px/reports
 .ui8px/telemetry
 bin
 node_modules
+*.db
+*.db-*
 
 web/static/asset-manifest.json
 web/static/css/app.*.css

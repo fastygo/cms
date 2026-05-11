@@ -5,18 +5,23 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
+FROM node:22-bookworm AS node-deps
+
+WORKDIR /src
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
 FROM go-base AS generated
 
 COPY . .
+COPY --from=node-deps /src/node_modules ./node_modules
 RUN go tool templ generate ./... \
     && go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static
 
 FROM node:22-bookworm AS assets
 
 WORKDIR /src
-
-COPY package.json package-lock.json ./
-RUN npm ci
 
 COPY --from=generated /src ./
 RUN npm run build:css \
