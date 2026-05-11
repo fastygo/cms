@@ -4,8 +4,8 @@
     "site_defaults": {
       "title": "GoCMS",
       "brand_name": "GoCMS",
-      "home_hero_title": "Публичный сайт на GoCMS.",
-      "home_intro": "Ниже — последние опубликованные записи."
+      "home_hero_title": "Держи пять, Бро",
+      "home_intro": "Смотри, что умеет админка GoCMS"
     },
     "routes": {
       "blog_title": "Блог",

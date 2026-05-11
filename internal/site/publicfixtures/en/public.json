@@ -4,8 +4,8 @@
     "site_defaults": {
       "title": "GoCMS",
       "brand_name": "GoCMS",
-      "home_hero_title": "Public site powered by GoCMS.",
-      "home_intro": "Latest fixtures and published posts below."
+      "home_hero_title": "Hold five, Bro",
+      "home_intro": "See what GoCMS admin can do"
     },
     "routes": {
       "blog_title": "Blog",
