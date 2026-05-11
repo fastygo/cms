@@ -1,8 +1,38 @@
 package elements
 
+templ HeadCanonical(href string) {
+	if href != "" {
+		<link rel="canonical" href={ href }/>
+	}
+}
+
+templ HeadMetaName(name string, content string) {
+	if name != "" && content != "" {
+		<meta name={ name } content={ content }/>
+	}
+}
+
+templ HeadMetaProperty(property string, content string) {
+	if property != "" && content != "" {
+		<meta property={ property } content={ content }/>
+	}
+}
+
+templ HeadStylesheet(href string) {
+	if href != "" {
+		<link rel="stylesheet" href={ href }/>
+	}
+}
+
 templ HeadScript(src string) {
 	if src != "" {
 		<script src={ src } defer></script>
+	}
+}
+
+templ HeadStylesheets(paths []string) {
+	for _, path := range paths {
+		@HeadStylesheet(path)
 	}
 }
 

@@ -1,0 +1,13 @@
+package elements
+
+import (
+	"strings"
+
+	templpkg "github.com/a-h/templ"
+)
+
+templ ProseHTML(content string) {
+	if strings.TrimSpace(content) != "" {
+		@templpkg.Raw(content)
+	}
+}

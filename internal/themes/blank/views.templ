@@ -35,7 +35,7 @@ templ ThemePage(data publicrender.PublicPage) {
 					}
 					if data.Content != "" {
 						@ui.Block(ui.BlockProps{Tag: "section", Class: "prose max-w-none"}) {
-							@templpkg.Raw(data.Content)
+							@elements.ProseHTML(data.Content)
 						}
 					}
 					for _, item := range data.Items {

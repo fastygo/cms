@@ -58,17 +58,108 @@
 }
 
 /* Public marketing shell: brand image in header instead of page title */
+.ui-shell-body--marketing .ui-header {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto !important;
+  grid-auto-rows: 1fr;
+  align-items: center !important;
+  column-gap: 0.5rem;
+}
+
+.ui-shell-body--marketing .ui-header-actions,
+.ui-shell-body--marketing .gocms-public-header-extra {
+  display: contents !important;
+}
+
+.ui-shell-body--marketing .ui-header-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .ui-shell-body--marketing .ui-header-logo-link {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  justify-self: start !important;
   line-height: 0;
 }
 
 .ui-shell-body--marketing .ui-header-logo-img {
   display: block;
-  max-height: 1.75rem;
   width: auto;
-  height: auto;
+  max-width: 8rem;
+  height: 2.5rem;
+  max-height: 2.5rem;
   object-fit: contain;
+}
+
+.ui-shell-body--marketing .ui-header .gocms-public-menu {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: end !important;
+  min-width: 0;
+}
+
+.ui-shell-body--marketing .ui-header #language-toggle {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+.ui-shell-body--marketing .ui-header #ui8kit-theme-toggle {
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+.ui-shell-body--marketing .ui-header .ui-header-menu-btn {
+  grid-column: 5 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: end !important;
+}
+
+@media (max-width: 47.999rem) {
+  .ui-shell-body--marketing .ui-header {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto !important;
+    align-items: center !important;
+  }
+
+  .ui-shell-body--marketing .ui-header .gocms-public-menu {
+    display: none !important;
+  }
+
+  .ui-shell-body--marketing .ui-header-logo-link {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .ui-shell-body--marketing .ui-header #language-toggle {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  .ui-shell-body--marketing .ui-header #ui8kit-theme-toggle {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+  }
+
+  .ui-shell-body--marketing .ui-header .ui-header-menu-btn {
+    grid-column: 5 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+  }
 }

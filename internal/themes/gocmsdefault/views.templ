@@ -37,40 +37,20 @@ templ ThemePage(data publicrender.PublicPage) {
 }
 
 templ themeHead(data publicrender.PublicPage) {
-	if data.SEO.CanonicalURL != "" {
-		<link rel="canonical" href={ templpkg.SafeURL(data.SEO.CanonicalURL) }/>
-	}
-	if data.SEO.Description != "" {
-		<meta name="description" content={ data.SEO.Description }/>
-	}
+	@elements.HeadCanonical(data.SEO.CanonicalURL)
+	@elements.HeadMetaName("description", data.SEO.Description)
 	if data.SEO.NoIndex {
-		<meta name="robots" content="noindex, nofollow"/>
+		@elements.HeadMetaName("robots", "noindex, nofollow")
 	}
-	<meta property="og:type" content={ ogType(data.SEO.Type) }/>
-	if data.SEO.Title != "" {
-		<meta property="og:title" content={ data.SEO.Title }/>
-	}
-	if data.SEO.Description != "" {
-		<meta property="og:description" content={ data.SEO.Description }/>
-	}
-	if data.SEO.CanonicalURL != "" {
-		<meta property="og:url" content={ data.SEO.CanonicalURL }/>
-	}
-	if data.SEO.ImageURL != "" {
-		<meta property="og:image" content={ data.SEO.ImageURL }/>
-	}
-	if data.SEO.PublishedAt != "" {
-		<meta property="article:published_time" content={ data.SEO.PublishedAt }/>
-	}
-	if data.SEO.ModifiedAt != "" {
-		<meta property="article:modified_time" content={ data.SEO.ModifiedAt }/>
-	}
-	for _, stylesheet := range data.Layout.Assets.Stylesheets {
-		<link rel="stylesheet" href={ templpkg.SafeURL(stylesheet) }/>
-	}
-	for _, script := range data.Layout.Assets.Scripts {
-		<script defer src={ templpkg.SafeURL(script) }></script>
-	}
+	@elements.HeadMetaProperty("og:type", ogType(data.SEO.Type))
+	@elements.HeadMetaProperty("og:title", data.SEO.Title)
+	@elements.HeadMetaProperty("og:description", data.SEO.Description)
+	@elements.HeadMetaProperty("og:url", data.SEO.CanonicalURL)
+	@elements.HeadMetaProperty("og:image", data.SEO.ImageURL)
+	@elements.HeadMetaProperty("article:published_time", data.SEO.PublishedAt)
+	@elements.HeadMetaProperty("article:modified_time", data.SEO.ModifiedAt)
+	@elements.HeadStylesheets(data.Layout.Assets.Stylesheets)
+	@elements.HeadScripts(data.Layout.Assets.Scripts)
 }
 
 templ siteHeader(layout publicrender.Layout) {
@@ -85,7 +65,21 @@ templ siteHeader(layout publicrender.Layout) {
 }
 
 templ publicShellHeaderExtra(layout publicrender.Layout) {
-	@ui.Box(ui.BoxProps{Class: "flex items-center gap-4"}) {
+	@ui.Box(ui.BoxProps{Class: "gocms-public-header-extra"}) {
+		@ui.ButtonBlock(ui.ButtonProps{
+			Href:      "/",
+			Variant:   "unstyled",
+			Class:     "ui-header-logo-link",
+			AriaLabel: publicHeaderLogoAlt(layout.Brand),
+		}) {
+			@ui.Image(ui.ImageProps{
+				Src:     "/static/img/gocms-logo.png",
+				Alt:     "",
+				Fit:     "contain",
+				Class:   "ui-header-logo-img",
+				Loading: "eager",
+			})
+		}
 		@elements.MarkerSection(elements.MarkerProps{
 			Class: "gocms-public-menu",
 			Attrs: templpkg.Attributes{"data-gocms-menu-location": "header"},
@@ -107,6 +101,13 @@ templ publicShellHeaderExtra(layout publicrender.Layout) {
 		}
 		@toggles.LanguageToggle(layout.Language)
 	}
+}
+
+func publicHeaderLogoAlt(brand string) string {
+	if strings.TrimSpace(brand) != "" {
+		return brand
+	}
+	return "GoCMS"
 }
 
 templ siteFooter(layout publicrender.Layout) {
@@ -459,7 +460,7 @@ templ pagination(data publicrender.Pagination) {
 templ ifText(content string) {
 	if strings.TrimSpace(content) != "" {
 		@ui.Block(ui.BlockProps{Tag: "section", Class: "prose max-w-none"}) {
-			@templpkg.Raw(content)
+			@elements.ProseHTML(content)
 		}
 	}
 }

@@ -37,28 +37,14 @@ templ ThemePage(data publicrender.PublicPage) {
 }
 
 templ themeHead(data publicrender.PublicPage) {
-	if data.SEO.CanonicalURL != "" {
-		<link rel="canonical" href={ templpkg.SafeURL(data.SEO.CanonicalURL) }/>
-	}
-	if data.SEO.Description != "" {
-		<meta name="description" content={ data.SEO.Description }/>
-	}
-	<meta property="og:type" content={ ogType(data.SEO.Type) }/>
-	if data.SEO.Title != "" {
-		<meta property="og:title" content={ data.SEO.Title }/>
-	}
-	if data.SEO.Description != "" {
-		<meta property="og:description" content={ data.SEO.Description }/>
-	}
-	if data.SEO.CanonicalURL != "" {
-		<meta property="og:url" content={ data.SEO.CanonicalURL }/>
-	}
-	for _, stylesheet := range data.Layout.Assets.Stylesheets {
-		<link rel="stylesheet" href={ templpkg.SafeURL(stylesheet) }/>
-	}
-	for _, script := range data.Layout.Assets.Scripts {
-		<script defer src={ templpkg.SafeURL(script) }></script>
-	}
+	@elements.HeadCanonical(data.SEO.CanonicalURL)
+	@elements.HeadMetaName("description", data.SEO.Description)
+	@elements.HeadMetaProperty("og:type", ogType(data.SEO.Type))
+	@elements.HeadMetaProperty("og:title", data.SEO.Title)
+	@elements.HeadMetaProperty("og:description", data.SEO.Description)
+	@elements.HeadMetaProperty("og:url", data.SEO.CanonicalURL)
+	@elements.HeadStylesheets(data.Layout.Assets.Stylesheets)
+	@elements.HeadScripts(data.Layout.Assets.Scripts)
 }
 
 templ siteHeader(layout publicrender.Layout) {
@@ -73,21 +59,25 @@ templ siteHeader(layout publicrender.Layout) {
 }
 
 templ publicShellHeaderExtra(layout publicrender.Layout) {
-	<div class="flex items-center gap-4">
+	@ui.Box(ui.BoxProps{Class: "flex items-center gap-4"}) {
 		@elements.MarkerSection(elements.MarkerProps{
 			Class: "gocms-public-menu",
 			Attrs: templpkg.Attributes{"data-gocms-menu-location": "header"},
 		}) {
-			<nav class="ui-header-nav-wrap" aria-label="Primary">
-				<div class="ui-header-nav">
+			@ui.Box(ui.BoxProps{Tag: "nav", Class: "ui-header-nav-wrap"}) {
+				@ui.Box(ui.BoxProps{Class: "ui-header-nav"}) {
 					for _, item := range flattenPublicMenu(layout.HeaderMenu) {
-						<a href={ templpkg.SafeURL(item.URL) } class={ publicHeaderNavLinkClass(item.Active) }>{ item.Label }</a>
+						@ui.Button(ui.ButtonProps{
+							Href:    item.URL,
+							Variant: "link",
+							Class:   publicHeaderNavLinkClass(item.Active),
+						}, item.Label)
 					}
-				</div>
-			</nav>
+				}
+			}
 		}
 		@toggles.LanguageToggle(layout.Language)
-	</div>
+	}
 }
 
 templ siteFooter(layout publicrender.Layout) {
@@ -249,7 +239,11 @@ templ featuredMedia(item *publicrender.MediaView) {
 	if item != nil && item.URL != "" {
 		@ui.Block(ui.BlockProps{Tag: "figure"}) {
 			@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-				<img src={ templpkg.SafeURL(item.URL) } alt={ item.AltText } class="w-full rounded-lg border border-border"/>
+				@ui.Image(ui.ImageProps{
+					Src:   item.URL,
+					Alt:   item.AltText,
+					Class: "w-full rounded-lg border border-border",
+				})
 				if item.Caption != "" {
 					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Caption)
 				}
@@ -261,7 +255,7 @@ templ featuredMedia(item *publicrender.MediaView) {
 templ contentBlock(content string) {
 	if strings.TrimSpace(content) != "" {
 		@ui.Block(ui.BlockProps{Tag: "section", Class: "prose max-w-none"}) {
-			@templpkg.Raw(content)
+			@elements.ProseHTML(content)
 		}
 	}
 }
