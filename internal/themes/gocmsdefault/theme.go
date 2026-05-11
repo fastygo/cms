@@ -40,7 +40,8 @@ func (Theme) Manifest() domainthemes.Manifest {
 		Slots: []domainthemes.Slot{"header", "footer", "before_content", "after_content"},
 		Settings: []domainthemes.SettingDefinition{
 			{Key: "theme.brand_name", Label: "Brand name", Type: "string", Default: "GoCMS", Public: true, Validation: "required"},
-			{Key: "theme.home_intro", Label: "Home intro", Type: "string", Default: "Public site powered by GoCMS.", Public: true},
+			// Empty default: public site resolves copy from publicfixtures by locale until an explicit value is saved.
+			{Key: "theme.home_intro", Label: "Home intro", Type: "string", Default: "", Public: true},
 		},
 	}
 }

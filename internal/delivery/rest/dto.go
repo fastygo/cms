@@ -122,12 +122,13 @@ type MediaDTO struct {
 }
 
 type AuthorDTO struct {
-	ID          string `json:"id"`
-	Slug        string `json:"slug"`
-	DisplayName string `json:"display_name"`
-	Bio         string `json:"bio,omitempty"`
-	AvatarURL   string `json:"avatar_url,omitempty"`
-	WebsiteURL  string `json:"website_url,omitempty"`
+	ID            string `json:"id"`
+	Slug          string `json:"slug"`
+	DisplayName   string `json:"display_name"`
+	Bio           string `json:"bio,omitempty"`
+	AvatarURL     string `json:"avatar_url,omitempty"`
+	AvatarMediaID string `json:"avatar_media_id,omitempty"`
+	WebsiteURL    string `json:"website_url,omitempty"`
 }
 
 type SettingDTO struct {
@@ -315,12 +316,13 @@ func MediaProjection(asset domainmedia.Asset) MediaDTO {
 
 func AuthorProjection(author domainusers.AuthorProfile) AuthorDTO {
 	return AuthorDTO{
-		ID:          string(author.ID),
-		Slug:        author.Slug,
-		DisplayName: author.DisplayName,
-		Bio:         author.Bio,
-		AvatarURL:   author.AvatarURL,
-		WebsiteURL:  author.WebsiteURL,
+		ID:            string(author.ID),
+		Slug:          author.Slug,
+		DisplayName:   author.DisplayName,
+		Bio:           author.Bio,
+		AvatarURL:     author.AvatarURL,
+		AvatarMediaID: author.AvatarMediaID,
+		WebsiteURL:    author.WebsiteURL,
 	}
 }
 

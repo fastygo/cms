@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -37,6 +38,7 @@ import (
 	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
 	"github.com/fastygo/cms/internal/platform/cmspanel"
+	"github.com/fastygo/cms/internal/platform/locales"
 	"github.com/fastygo/cms/internal/platform/plugins"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
@@ -304,20 +306,99 @@ func (h Handler) adminPageHandler(pageID string, role cmspanel.AdminRouteRole) f
 }
 
 func (h Handler) Register(mux *http.ServeMux) {
+	registerAdminLegacyPathRedirects(mux)
 	mux.HandleFunc("GET /go-login", h.loginPage)
 	mux.HandleFunc("POST /go-login", h.loginSubmit)
 	mux.HandleFunc("POST /go-logout", h.logoutSubmit)
-	for _, route := range h.registry.RoutesForSurface(plugins.SurfaceAdmin) {
+	adminRoutes := h.registry.RoutesForSurface(plugins.SurfaceAdmin)
+	for _, route := range adminRoutes {
 		if route.Protected {
 			mux.HandleFunc(route.Pattern, h.protectCapability(route.Capability, route.ProtectedHandler))
 			continue
 		}
 		mux.HandleFunc(route.Pattern, route.Handler)
 	}
+	registerAdminTrailingSlashRedirects(mux, adminRoutes)
+}
+
+func registerAdminLegacyPathRedirects(mux *http.ServeMux) {
+	methods := []string{
+		http.MethodGet, http.MethodHead, http.MethodPost,
+		http.MethodPut, http.MethodPatch, http.MethodDelete,
+	}
+	for _, method := range methods {
+		mux.HandleFunc(method+" /admin", adminLegacyRootRedirect)
+		mux.HandleFunc(method+" /admin/", adminLegacySubtreeRedirect)
+	}
+}
+
+func adminLegacyRootRedirect(w http.ResponseWriter, r *http.Request) {
+	target := "/go-admin"
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusPermanentRedirect)
+}
+
+func adminLegacySubtreeRedirect(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if !strings.HasPrefix(path, "/admin/") {
+		http.NotFound(w, r)
+		return
+	}
+	suffix := strings.TrimPrefix(path, "/admin")
+	target := "/go-admin" + suffix
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusPermanentRedirect)
+}
+
+func registerAdminTrailingSlashRedirects(mux *http.ServeMux, routes []plugins.Route) {
+	seen := make(map[string]struct{})
+	for _, route := range routes {
+		parts := strings.Fields(strings.TrimSpace(route.Pattern))
+		if len(parts) < 2 {
+			continue
+		}
+		method, path := parts[0], parts[1]
+		if method != http.MethodGet && method != http.MethodHead {
+			continue
+		}
+		if !strings.HasPrefix(path, "/go-admin") {
+			continue
+		}
+		if strings.HasSuffix(path, "/") {
+			continue
+		}
+		redirPattern := method + " " + path + "/{$}"
+		if _, dup := seen[redirPattern]; dup {
+			continue
+		}
+		seen[redirPattern] = struct{}{}
+		mux.HandleFunc(redirPattern, adminStripTrailingSlashRedirect)
+	}
+}
+
+func adminStripTrailingSlashRedirect(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if !strings.HasSuffix(path, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	target := strings.TrimSuffix(path, "/")
+	if target == "" {
+		target = "/"
+	}
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	status := http.StatusPermanentRedirect
+	http.Redirect(w, r, target, status)
 }
 
 func (h Handler) NavItems() []app.NavItem {
-	return h.navigation(adminfixtures.MustLoad("en"), authz.Root())
+	return h.navigation(adminfixtures.MustLoad(locales.Default), authz.Root())
 }
 
 func (h Handler) NavItemsFromBundle(bundle adminfixtures.AdminFixture) []app.NavItem {
@@ -339,7 +420,7 @@ func (h Handler) navigation(bundle adminfixtures.AdminFixture, principal authz.P
 
 func (h Handler) fixture(r *http.Request) adminfixtures.AdminFixture {
 	if r == nil {
-		return adminfixtures.MustLoad("en")
+		return adminfixtures.MustLoad(locales.Default)
 	}
 	return adminfixtures.MustLoad(locale.From(r.Context()))
 }
@@ -422,7 +503,8 @@ func (h Handler) protectCapability(capability authz.Capability, next func(http.R
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := h.auth.Principal(r)
 		if !ok || !principal.Has(authz.CapabilityControlPanelAccess) {
-			http.Redirect(w, r, "/go-login?return_to="+r.URL.Path, http.StatusSeeOther)
+			ret := normalizeAdminReturnPath(r.URL.Path)
+			http.Redirect(w, r, "/go-login?return_to="+url.QueryEscape(ret), http.StatusSeeOther)
 			return
 		}
 		if capability != "" && !principal.Has(capability) {
@@ -515,8 +597,8 @@ func (h Handler) contentList(kind domaincontent.Kind, screen string) func(http.R
 		for _, entry := range result.Items {
 			rows = append(rows, blocks.ContentRow{
 				ID:           string(entry.ID),
-				Title:        entry.Title.Value("en", "en"),
-				Slug:         entry.Slug.Value("en", "en"),
+				Title:        entry.Title.Value(locales.Default, locales.ContentFallback(locales.Default)),
+				Slug:         entry.Slug.Value(locales.Default, locales.ContentFallback(locales.Default)),
 				Status:       string(entry.Status),
 				Author:       entry.AuthorID,
 				EditURL:      basePath + "/" + string(entry.ID) + "/edit",
@@ -585,9 +667,9 @@ func (h Handler) contentEdit(screen string) func(http.ResponseWriter, *http.Requ
 		resource, _ := cmspanel.ResourceByID(screen)
 		basePath := fallbackValue(resource.BasePath, "/go-admin/"+screen)
 		data := views.ContentEditPageData{
-			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), basePath),
+			Layout: h.layout(r, principal, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value(locales.Default, locales.ContentFallback(locales.Default)), basePath),
 			Screen: screen + "-edit",
-			Editor: h.contentEditor(r.Context(), fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value("en", "en"), description, basePath+"/"+string(entry.ID), h.token("content-write"), entry),
+			Editor: h.contentEditor(r.Context(), fixture, h.labelFromFixture(fixture, "action_edit", "Edit")+" "+entry.Title.Value(locales.Default, locales.ContentFallback(locales.Default)), description, basePath+"/"+string(entry.ID), h.token("content-write"), entry),
 		}
 		_ = web.Render(r.Context(), w, views.ContentEditPage(data))
 	}
@@ -831,7 +913,7 @@ func (h Handler) termsPage(w http.ResponseWriter, r *http.Request, principal aut
 		rows = append(rows, blocks.SimpleListRow{
 			ID:           string(item.ID),
 			Label:        string(item.ID),
-			Description:  item.Name.Value("en", "en"),
+			Description:  item.Name.Value(locales.Default, locales.ContentFallback(locales.Default)),
 			Status:       string(item.Type),
 			QuickEditURL: listui.BuildEditHref(state, basePath, string(item.ID)),
 		})
@@ -1111,6 +1193,17 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 		user.MustChangePassword = current.MustChangePassword
 		user.LastLoginAt = current.LastLoginAt
 	}
+	avatarMediaID := strings.TrimSpace(r.PostForm.Get("avatar_media_id"))
+	if avatarMediaID != "" {
+		if _, ok, err := h.services.Media.Get(r.Context(), domainmedia.ID(avatarMediaID)); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		} else if !ok {
+			http.Error(w, fmt.Sprintf("media asset %q is not registered", avatarMediaID), http.StatusBadRequest)
+			return
+		}
+	}
+	user.Profile.AvatarMediaID = avatarMediaID
 	if err := h.services.Users.Save(r.Context(), user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1544,10 +1637,10 @@ func (h Handler) contentEditor(ctx context.Context, bundle adminfixtures.AdminFi
 	fields := h.formFieldsFromFixture(bundle, "content-editor", contentFormFields(schema, entry, editorProvider))
 	fields = fieldsWithoutIDs(fields, "meta_key", "meta_value")
 
-	updateFieldValue(fields, "title", entry.Title.Value("en", "en"))
-	updateFieldValue(fields, "slug", entry.Slug.Value("en", "en"))
-	updateFieldValue(fields, "content", entry.Body.Value("en", "en"))
-	updateFieldValue(fields, "excerpt", entry.Excerpt.Value("en", "en"))
+	updateFieldValue(fields, "title", entry.Title.Value(locales.Default, locales.ContentFallback(locales.Default)))
+	updateFieldValue(fields, "slug", entry.Slug.Value(locales.Default, locales.ContentFallback(locales.Default)))
+	updateFieldValue(fields, "content", entry.Body.Value(locales.Default, locales.ContentFallback(locales.Default)))
+	updateFieldValue(fields, "excerpt", entry.Excerpt.Value(locales.Default, locales.ContentFallback(locales.Default)))
 	updateFieldValue(fields, "author_id", defaultValue(entry.AuthorID, "author-1"))
 	updateFieldValue(fields, "featured_media_id", entry.FeaturedMediaID)
 	updateFieldValue(fields, "template", entry.Template)
@@ -1763,21 +1856,45 @@ func returnTo(r *http.Request) string {
 }
 
 func safeReturnTo(value string) string {
-	if strings.HasPrefix(value, "/go-admin") {
-		return value
+	return normalizeAdminReturnPath(value)
+}
+
+func normalizeAdminReturnPath(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "/go-admin"
+	}
+	if !strings.HasPrefix(v, "/") || strings.HasPrefix(v, "//") {
+		return "/go-admin"
+	}
+	if strings.HasPrefix(v, "/go-admin") {
+		return v
+	}
+	if v == "/admin" {
+		return "/go-admin"
+	}
+	if strings.HasPrefix(v, "/admin/") {
+		return "/go-admin/" + strings.TrimPrefix(v, "/admin/")
 	}
 	return "/go-admin"
 }
 
 func adminReturnTo(value string, fallback string) string {
-	if strings.HasPrefix(strings.TrimSpace(value), "/go-admin") {
-		return value
+	v := strings.TrimSpace(value)
+	if strings.HasPrefix(v, "/go-admin") {
+		return v
+	}
+	if v == "/admin" {
+		return "/go-admin"
+	}
+	if strings.HasPrefix(v, "/admin/") {
+		return "/go-admin/" + strings.TrimPrefix(v, "/admin/")
 	}
 	return fallback
 }
 
 func localized(value string) domaincontent.LocalizedText {
-	return domaincontent.LocalizedText{"en": strings.TrimSpace(value)}
+	return domaincontent.LocalizedText{locales.Default: strings.TrimSpace(value)}
 }
 
 func (h Handler) formMetadata(r *http.Request, kind domaincontent.Kind) domaincontent.Metadata {
@@ -2245,13 +2362,13 @@ func contentFieldData(field panel.Field, entry domaincontent.Entry, editorProvid
 func contentFieldValue(id string, entry domaincontent.Entry) string {
 	switch id {
 	case "title":
-		return entry.Title.Value("en", "en")
+		return entry.Title.Value(locales.Default, locales.ContentFallback(locales.Default))
 	case "slug":
-		return entry.Slug.Value("en", "en")
+		return entry.Slug.Value(locales.Default, locales.ContentFallback(locales.Default))
 	case "content":
-		return entry.Body.Value("en", "en")
+		return entry.Body.Value(locales.Default, locales.ContentFallback(locales.Default))
 	case "excerpt":
-		return entry.Excerpt.Value("en", "en")
+		return entry.Excerpt.Value(locales.Default, locales.ContentFallback(locales.Default))
 	case "author_id":
 		return defaultValue(entry.AuthorID, "author-1")
 	case "featured_media_id":

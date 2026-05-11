@@ -17,11 +17,12 @@ templ ThemePage(data publicrender.PublicPage) {
 		Lang:           data.Layout.Lang,
 		BrandName:      data.Layout.Brand,
 		Active:         data.Layout.ActivePath,
+		NavItems:       publicMenuNavItems(data.Layout.HeaderMenu),
 		CSSPath:        data.Layout.Assets.Base.CSS,
 		ThemeJSPath:    data.Layout.Assets.Base.ThemeJS,
 		AppJSPath:      data.Layout.Assets.Base.AppJS,
 		HeadExtra:      themeHead(data),
-		HeaderExtra:    toggles.LanguageToggle(data.Layout.Language),
+		HeaderExtra:    publicShellHeaderExtra(data.Layout),
 		ThemeToggle: ui8layout.ThemeToggleProps{
 			Label:              data.Layout.ThemeToggle.Label,
 			SwitchToDarkLabel:  data.Layout.ThemeToggle.SwitchToDarkLabel,
@@ -68,19 +69,25 @@ templ siteHeader(layout publicrender.Layout) {
 			"data-gocms-style-preset":  layout.StylePresetID,
 		},
 	}) {
-		@ui.Container(ui.ContainerProps{Class: "py-8"}) {
-			@ui.Group(ui.GroupProps{Class: "justify-between items-start gap-6"}) {
-				@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-					@ui.Badge(ui.BadgeProps{Variant: "outline"}, "Company theme")
-					@ui.Title(ui.TitleProps{Order: 2}, layout.Brand)
-					if layout.Tagline != "" {
-						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Tagline)
-					}
-				}
-				@menuTree(layout.HeaderMenu, "header")
-			}
-		}
 	}
+}
+
+templ publicShellHeaderExtra(layout publicrender.Layout) {
+	<div class="flex items-center gap-4">
+		@elements.MarkerSection(elements.MarkerProps{
+			Class: "gocms-public-menu",
+			Attrs: templpkg.Attributes{"data-gocms-menu-location": "header"},
+		}) {
+			<nav class="ui-header-nav-wrap" aria-label="Primary">
+				<div class="ui-header-nav">
+					for _, item := range flattenPublicMenu(layout.HeaderMenu) {
+						<a href={ templpkg.SafeURL(item.URL) } class={ publicHeaderNavLinkClass(item.Active) }>{ item.Label }</a>
+					}
+				</div>
+			</nav>
+		}
+		@toggles.LanguageToggle(layout.Language)
+	</div>
 }
 
 templ siteFooter(layout publicrender.Layout) {
@@ -91,7 +98,7 @@ templ siteFooter(layout publicrender.Layout) {
 		@ui.Container(ui.ContainerProps{Class: "py-8"}) {
 			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
 				@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Brand+" public frontend")
-				@menuTree(layout.FooterMenu, "footer")
+				@menuTree(layout.FooterMenu, "footer", layout.Chrome.NoMenuItems)
 			}
 		}
 	}
@@ -112,13 +119,13 @@ templ pageBody(data publicrender.PublicPage) {
 				@companyHero(data)
 				switch data.Kind {
 				case publicrender.RenderKindHome, publicrender.RenderKindBlog, publicrender.RenderKindArchive, publicrender.RenderKindTaxonomy, publicrender.RenderKindAuthor, publicrender.RenderKindSearch:
-					@archiveGrid(data.Items)
+					@archiveGrid(data)
 					@pagination(data.Pagination)
 				case publicrender.RenderKindPost, publicrender.RenderKindPage:
 					@featuredMedia(data.Featured)
 					@contentBlock(data.Content)
 					@contentContext(data)
-					@relatedItems(data.RelatedItems)
+					@relatedItems(data)
 				default:
 					if data.ActionLabel != "" {
 						@ui.Button(ui.ButtonProps{Href: "/", Variant: "outline"}, data.ActionLabel)
@@ -137,11 +144,11 @@ templ companyHero(data publicrender.PublicPage) {
 			if data.Description != "" {
 				@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
 			}
-			if data.Query != "" {
-				@ui.Badge(ui.BadgeProps{Variant: "outline"}, `Search: "`+data.Query+`"`)
+			if data.QueryBadge != "" {
+				@ui.Badge(ui.BadgeProps{Variant: "outline"}, data.QueryBadge)
 			}
-			if data.Author != nil {
-				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "Author: "+data.Author.DisplayName)
+			if data.AuthorAttributionLine != "" {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.AuthorAttributionLine)
 			}
 			if len(data.Terms) > 0 {
 				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(data.Terms))
@@ -149,14 +156,21 @@ templ companyHero(data publicrender.PublicPage) {
 			if data.Published != "" {
 				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Published)
 			}
+			if data.Layout.Chrome.ThemePresetBadge != "" {
+				@ui.Badge(ui.BadgeProps{Variant: "outline"}, data.Layout.Chrome.ThemePresetBadge)
+			}
 		}
 	}
 }
 
-templ archiveGrid(items []publicrender.ArchiveItem) {
+templ archiveGrid(data publicrender.PublicPage) {
+	@archiveGridList(data.Items, data.Layout.Chrome)
+}
+
+templ archiveGridList(items []publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
 	@ui.Stack(ui.StackProps{Class: "gap-5"}) {
 		if len(items) == 0 {
-			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, "No public content is available yet.")
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, chrome.EmptyArchive)
 		}
 		for _, item := range items {
 			@elements.MarkerSection(elements.MarkerProps{
@@ -171,9 +185,9 @@ templ archiveGrid(items []publicrender.ArchiveItem) {
 								if item.Summary != "" {
 									@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, item.Summary)
 								}
-								@archiveMeta(item)
+								@archiveMeta(item, chrome)
 							}
-							@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "outline"}, "Read")
+							@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "outline"}, chrome.ReadAction)
 						}
 						@featuredMedia(item.Featured)
 					}
@@ -183,13 +197,13 @@ templ archiveGrid(items []publicrender.ArchiveItem) {
 	}
 }
 
-templ archiveMeta(item publicrender.ArchiveItem) {
+templ archiveMeta(item publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
 	@ui.Stack(ui.StackProps{Class: "gap-1"}) {
 		if item.Meta != "" {
 			@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Meta)
 		}
 		if item.Author != nil {
-			@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "By "+item.Author.DisplayName)
+			@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, chrome.ByAuthorPrefix+item.Author.DisplayName)
 		}
 		if len(item.Terms) > 0 {
 			@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(item.Terms))
@@ -202,7 +216,7 @@ templ contentContext(data publicrender.PublicPage) {
 		if data.Author != nil {
 			@ui.Block(ui.BlockProps{Tag: "section"}) {
 				@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-					@ui.Title(ui.TitleProps{Order: 3}, "Expert")
+					@ui.Title(ui.TitleProps{Order: 3}, data.Layout.Chrome.AuthorExpertTitle)
 					@ui.Text(ui.TextProps{}, data.Author.DisplayName)
 					if data.Author.Bio != "" {
 						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Author.Bio)
@@ -216,12 +230,16 @@ templ contentContext(data publicrender.PublicPage) {
 	}
 }
 
-templ relatedItems(items []publicrender.ArchiveItem) {
-	if len(items) > 0 {
+templ relatedItems(data publicrender.PublicPage) {
+	if len(data.RelatedItems) > 0 {
 		@ui.Block(ui.BlockProps{Tag: "section"}) {
 			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
-				@ui.Title(ui.TitleProps{Order: 3}, "Related insights")
-				@archiveGrid(items)
+				if strings.TrimSpace(data.Layout.Chrome.RelatedInsightsTitle) != "" {
+					@ui.Title(ui.TitleProps{Order: 3}, data.Layout.Chrome.RelatedInsightsTitle)
+				} else {
+					@ui.Title(ui.TitleProps{Order: 3}, data.Layout.Chrome.RelatedTitle)
+				}
+				@archiveGridList(data.RelatedItems, data.Layout.Chrome)
 			}
 		}
 	}
@@ -270,12 +288,15 @@ templ breadcrumbs(items []publicrender.Breadcrumb) {
 	}
 }
 
-templ menuTree(items []publicrender.MenuItem, location string) {
+templ menuTree(items []publicrender.MenuItem, location string, emptyHint string) {
 	@elements.MarkerSection(elements.MarkerProps{
 		Class: "gocms-public-menu",
 		Attrs: templpkg.Attributes{"data-gocms-menu-location": location},
 	}) {
 		@ui.Group(ui.GroupProps{Class: "flex-wrap gap-2"}) {
+			if len(items) == 0 {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, emptyHint)
+			}
 			for _, item := range items {
 				@menuItem(item, 0)
 			}

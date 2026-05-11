@@ -21,6 +21,7 @@ import (
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/locales"
 	_ "modernc.org/sqlite"
 )
 
@@ -890,9 +891,9 @@ func sortContent(entries []domaincontent.Entry, query domaincontent.Query) {
 func contentLess(a domaincontent.Entry, b domaincontent.Entry, query domaincontent.Query) bool {
 	switch query.SortBy {
 	case domaincontent.SortTitle:
-		return strings.ToLower(a.Title.Value(query.Locale, "en")) < strings.ToLower(b.Title.Value(query.Locale, "en"))
+		return strings.ToLower(a.Title.Value(query.Locale, locales.ContentFallback(query.Locale))) < strings.ToLower(b.Title.Value(query.Locale, locales.ContentFallback(query.Locale)))
 	case domaincontent.SortSlug:
-		return strings.ToLower(a.Slug.Value(query.Locale, "en")) < strings.ToLower(b.Slug.Value(query.Locale, "en"))
+		return strings.ToLower(a.Slug.Value(query.Locale, locales.ContentFallback(query.Locale))) < strings.ToLower(b.Slug.Value(query.Locale, locales.ContentFallback(query.Locale)))
 	case domaincontent.SortPublishedAt:
 		return timeValue(a.PublishedAt, a.CreatedAt).Before(timeValue(b.PublishedAt, b.CreatedAt))
 	case domaincontent.SortCreatedAt:
@@ -939,7 +940,13 @@ func localizedEquals(values domaincontent.LocalizedText, locale string, expected
 		return true
 	}
 	if locale != "" {
-		return strings.ToLower(values.Value(locale, "en")) == expected
+		fb := locales.ContentFallback(locale)
+		if strings.ToLower(strings.TrimSpace(values.Value(locale, fb))) == expected {
+			return true
+		}
+		if strings.ToLower(strings.TrimSpace(values.Value(fb, locale))) == expected {
+			return true
+		}
 	}
 	for _, value := range values {
 		if strings.ToLower(strings.TrimSpace(value)) == expected {

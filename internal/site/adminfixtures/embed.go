@@ -3,10 +3,11 @@ package adminfixtures
 import (
 	"embed"
 
+	"github.com/fastygo/cms/internal/platform/locales"
 	"github.com/fastygo/framework/pkg/web/i18n"
 )
 
-//go:embed en/*.json ru/*.json
+//go:embed */admin.json
 var fixtureFS embed.FS
 
 type ThemeFixture struct {
@@ -104,9 +105,10 @@ type Bundle struct {
 	Admin AdminFixture `json:"admin"`
 }
 
-var Locales = []string{"en", "ru"}
+// Locales lists fixture directories (must match Supported() order is not required).
+var Locales = locales.Supported()
 
-var store = i18n.New[Bundle](fixtureFS, Locales, "en", func(reader i18n.Reader, loc string) (Bundle, error) {
+var store = i18n.New[Bundle](fixtureFS, Locales, locales.DefaultForI18n(), func(reader i18n.Reader, loc string) (Bundle, error) {
 	bundle, err := i18n.DecodeSection[Bundle](reader, loc, "admin")
 	if err != nil {
 		return Bundle{}, err
@@ -119,13 +121,22 @@ func Load(locale string) (Bundle, error) {
 }
 
 func MustLoad(locale string) AdminFixture {
-	admin, err := Load(locale)
-	if err == nil {
+	loc := locales.NormalizeOrDefault(locale)
+	if admin, err := Load(loc); err == nil {
 		return admin.Admin
 	}
-	admin, err = Load("en")
-	if err == nil {
-		return admin.Admin
+	if loc != locales.Default {
+		if admin, err := Load(locales.Default); err == nil {
+			return admin.Admin
+		}
+	}
+	for _, fallback := range locales.Supported() {
+		if fallback == loc {
+			continue
+		}
+		if admin, err := Load(fallback); err == nil {
+			return admin.Admin
+		}
 	}
 	return AdminFixture{}
 }

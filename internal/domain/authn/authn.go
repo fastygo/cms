@@ -87,9 +87,9 @@ func DefaultSessionPolicy(secureCookies bool) SessionPolicy {
 		SecureCookies:    secureCookies,
 		SameSite:         "lax",
 		RotateAfterLogin: true,
-		MaxAttempts:      5,
-		AttemptWindow:    15 * time.Minute,
-		LockoutWindow:    15 * time.Minute,
+		MaxAttempts:      3,
+		AttemptWindow:    24 * time.Hour,
+		LockoutWindow:    24 * time.Hour,
 	}
 }
 
@@ -101,13 +101,13 @@ func (p SessionPolicy) Normalized() SessionPolicy {
 		p.AbsoluteTTL = 7 * 24 * time.Hour
 	}
 	if p.MaxAttempts <= 0 {
-		p.MaxAttempts = 5
+		p.MaxAttempts = 3
 	}
 	if p.AttemptWindow <= 0 {
-		p.AttemptWindow = 15 * time.Minute
+		p.AttemptWindow = 24 * time.Hour
 	}
 	if p.LockoutWindow <= 0 {
-		p.LockoutWindow = 15 * time.Minute
+		p.LockoutWindow = 24 * time.Hour
 	}
 	switch strings.TrimSpace(strings.ToLower(p.SameSite)) {
 	case "strict", "none":

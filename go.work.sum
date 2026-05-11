@@ -1,3 +1,4 @@
+github.com/fastygo/panel v0.0.0-20260507153054-7d218c36141b/go.mod h1:WjPcCDq27OZxGzemgEOGQ4YYVrnO7ogFvrTNl2BDkr0=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
 github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=

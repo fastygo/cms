@@ -17,7 +17,7 @@ The default non-demo policy is now `local`.
 Fixture seeding creates these local accounts:
 
 - `admin@example.test` with password `admin`
-- `jane@example.test` with password `editor`
+- `mr.gopher@gocms.example.test` (login `mrgopher`) with password `editor`
 - `viewer@example.test` with password `viewer`
 
 These credentials are for seeded development/test installs only. Real operators should rotate them immediately from the `Users` screen.

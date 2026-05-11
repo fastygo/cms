@@ -31,7 +31,7 @@ func TestCompanyThemePackageRendersAsCompiledPublicTheme(t *testing.T) {
 		`data-gocms-public-header="company"`,
 		`data-gocms-style-preset="company-bold-tech"`,
 		`/static/themes/company/theme.css`,
-		"Company theme",
+		"Theme: company | Preset: company-bold-tech",
 		"Published Post",
 	} {
 		if !strings.Contains(rec.Body.String(), expected) {

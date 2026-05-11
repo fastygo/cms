@@ -570,7 +570,13 @@ func (h Handler) getAuthor(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusNotFound, "not_found", "author not found", nil)
 		return
 	}
-	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: AuthorProjection(author)})
+	dto := AuthorProjection(author)
+	if mid := strings.TrimSpace(author.AvatarMediaID); mid != "" {
+		if asset, found, gerr := h.services.Media.Get(r.Context(), domainmedia.ID(mid)); gerr == nil && found {
+			dto.AvatarURL = asset.PublicURL
+		}
+	}
+	_ = web.WriteJSON(w, http.StatusOK, ResourceEnvelope{Data: dto})
 }
 
 func (h Handler) search(w http.ResponseWriter, r *http.Request) {

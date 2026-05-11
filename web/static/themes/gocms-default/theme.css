@@ -4,5 +4,71 @@
 }
 
 .gocms-public-footer[data-gocms-public-footer="gocms-default"] {
-  border-top: 1px solid hsl(var(--border));
+  border-top: none;
+}
+
+/* Hero: primary gradient, same family as archive cards (rounded-2xl on section) */
+.gocms-public-hero-card {
+  background: linear-gradient(
+    145deg,
+    hsl(var(--primary) / 0.16) 0%,
+    hsl(var(--primary) / 0.07) 45%,
+    hsl(var(--background)) 100%
+  );
+  border: 1px solid hsl(var(--primary) / 0.22);
+  box-shadow:
+    0 1px 0 hsl(var(--primary) / 0.08) inset,
+    0 18px 48px -28px hsl(var(--primary) / 0.35);
+}
+
+/* Match figure/image inner radius (rounded-xl); smaller than card (rounded-2xl) */
+.gocms-public-archive-cta a {
+  border-radius: 0.75rem;
+}
+
+/* 1px primary-tinted gradient rules (full + half width) */
+.gocms-public-gradient-rule {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--primary) / 0.42) 50%,
+    transparent 100%
+  );
+}
+
+.gocms-public-gradient-rule--half {
+  width: min(50vw, 42rem);
+}
+
+/* Footer link grid: two columns on sm+ */
+.gocms-public-footer-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2rem;
+  row-gap: 0.5rem;
+}
+
+@media (max-width: 639px) {
+  .gocms-public-footer-links {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Public marketing shell: brand image in header instead of page title */
+.ui-shell-body--marketing .ui-header-logo-link {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  line-height: 0;
+}
+
+.ui-shell-body--marketing .ui-header-logo-img {
+  display: block;
+  max-height: 1.75rem;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }

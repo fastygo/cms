@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
+	"github.com/fastygo/cms/internal/platform/locales"
 )
 
 const (
@@ -205,8 +207,47 @@ func matchPostPattern(pattern string, trimmedPath string) (Candidate, bool) {
 	return candidate, true
 }
 
+// slugForPermalink returns a non-empty slug for URL building, independent of which
+// LocalizedText key the editor stored (admin uses locales.Default, often "ru").
+func slugForPermalink(entry domaincontent.Entry) string {
+	active := locales.Default
+	fb := locales.ContentFallback(active)
+	if s := strings.TrimSpace(entry.Slug.Value(active, fb)); s != "" {
+		return s
+	}
+	if s := strings.TrimSpace(entry.Slug.Value(fb, active)); s != "" {
+		return s
+	}
+	keys := make([]string, 0, len(entry.Slug))
+	for k := range entry.Slug {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		if s := strings.TrimSpace(entry.Slug[k]); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// entrySlugMatchesURL reports whether the path slug from the request matches this entry
+// (any localized slug value).
+func entrySlugMatchesURL(requestSlug string, entry domaincontent.Entry) bool {
+	requestSlug = strings.TrimSpace(requestSlug)
+	if requestSlug == "" {
+		return false
+	}
+	for _, v := range entry.Slug {
+		if strings.TrimSpace(v) == requestSlug {
+			return true
+		}
+	}
+	return false
+}
+
 func buildPagePath(entry domaincontent.Entry, pattern string) string {
-	slug := strings.TrimSpace(entry.Slug.Value("en", "en"))
+	slug := slugForPermalink(entry)
 	if slug == "" {
 		return "/"
 	}
@@ -214,7 +255,10 @@ func buildPagePath(entry domaincontent.Entry, pattern string) string {
 }
 
 func buildPostPath(entry domaincontent.Entry, pattern string) string {
-	slug := strings.TrimSpace(entry.Slug.Value("en", "en"))
+	slug := slugForPermalink(entry)
+	if slug == "" {
+		return "/"
+	}
 	point := entry.CreatedAt
 	if entry.PublishedAt != nil {
 		point = *entry.PublishedAt
@@ -238,7 +282,7 @@ func MatchesEntry(candidate Candidate, entry domaincontent.Entry) bool {
 	case CandidatePostID:
 		return string(entry.ID) == candidate.ID
 	case CandidatePostSlug:
-		if candidate.Slug != entry.Slug.Value("en", "en") {
+		if !entrySlugMatchesURL(candidate.Slug, entry) {
 			return false
 		}
 		if candidate.Year != 0 && point.UTC().Year() != candidate.Year {

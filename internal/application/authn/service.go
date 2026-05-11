@@ -11,6 +11,7 @@ import (
 	domainauthn "github.com/fastygo/cms/internal/domain/authn"
 	"github.com/fastygo/cms/internal/domain/authz"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/loginbrute"
 	"github.com/google/uuid"
 )
 
@@ -378,25 +379,22 @@ func (s Service) lockedOut(ctx context.Context, key string, policy domainauthn.S
 	if strings.TrimSpace(key) == "" {
 		return false, nil
 	}
-	items, err := s.repo.ListLoginAttempts(ctx, key, s.now().UTC().Add(-policy.AttemptWindow))
+	now := s.now().UTC()
+	windowStart := now.Add(-policy.AttemptWindow)
+	items, err := s.repo.ListLoginAttempts(ctx, key, windowStart)
 	if err != nil {
 		return false, err
 	}
-	failures := 0
-	latest := time.Time{}
+	attempts := make([]loginbrute.Attempt, 0, len(items))
 	for _, item := range items {
-		if item.Success {
-			continue
-		}
-		failures++
-		if item.CreatedAt.After(latest) {
-			latest = item.CreatedAt
-		}
+		attempts = append(attempts, loginbrute.Attempt{Success: item.Success, CreatedAt: item.CreatedAt})
 	}
-	if failures < policy.MaxAttempts || latest.IsZero() {
-		return false, nil
+	lb := loginbrute.Policy{
+		MaxAttempts:   policy.MaxAttempts,
+		AttemptWindow: policy.AttemptWindow,
+		LockoutWindow: policy.LockoutWindow,
 	}
-	return latest.Add(policy.LockoutWindow).After(s.now().UTC()), nil
+	return loginbrute.LockedOut(now, lb, windowStart, attempts), nil
 }
 
 func (s Service) recordAttempt(ctx context.Context, key string, userID domainusers.ID, input PasswordLoginInput, success bool) error {

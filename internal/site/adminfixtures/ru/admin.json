@@ -15,7 +15,7 @@
       "current_label": "RU",
       "next_label": "EN",
       "next_locale": "en",
-      "available": ["en", "ru"],
+      "available": ["ru", "en"],
       "locale_labels": {
         "en": "EN",
         "ru": "RU"
@@ -23,7 +23,7 @@
     },
     "login": {
       "title": "Вход в GoCMS",
-      "subtitle": "Используйте демо-пользователя: admin@example.test / admin.",
+      "subtitle": "Скоро можно будет зайти",
       "error_invalid_credentials": "Неверные учётные данные."
     },
     "navigation": [
@@ -233,6 +233,8 @@
       "action_previous": "Назад",
       "action_next": "Вперёд",
       "field_email": "Email",
+      "field_avatar_media_id": "ID аватара в медиатеке",
+      "field_avatar_media_id_placeholder": "ID файла из медиатеки (как избранное медиа у записей)",
       "field_password": "Пароль",
       "field_site_title": "Заголовок сайта",
       "field_public_rendering": "Публичная отрисовка",

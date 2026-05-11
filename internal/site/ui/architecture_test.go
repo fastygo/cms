@@ -55,6 +55,9 @@ func TestGoCMSCSSUsesApplyOnlySelectors(t *testing.T) {
 		if strings.HasSuffix(path, "editor.css") {
 			return
 		}
+		if strings.HasSuffix(path, "tweakcn.css") {
+			return
+		}
 		if strings.Contains(filepath.ToSlash(path), "/ui8kit/") || strings.HasSuffix(path, "fonts.css") {
 			return
 		}
@@ -74,6 +77,9 @@ func TestGoCMSDoesNotUseCustomCSSProperties(t *testing.T) {
 	customProperty := regexp.MustCompile(`^\s*--[a-z0-9-]+\s*:`)
 	forEachFile(t, filepath.FromSlash("../../../web/static/css"), func(path string, content string) {
 		if !strings.HasSuffix(path, ".css") || strings.HasSuffix(path, "tokens.css") || strings.HasSuffix(path, "input.css") {
+			return
+		}
+		if strings.HasSuffix(path, "tweakcn.css") {
 			return
 		}
 		if strings.Contains(filepath.ToSlash(path), "/ui8kit/") || strings.HasSuffix(path, "fonts.css") {

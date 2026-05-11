@@ -15,7 +15,7 @@
       "current_label": "EN",
       "next_label": "RU",
       "next_locale": "ru",
-      "available": ["en", "ru"],
+      "available": ["ru", "en"],
       "locale_labels": {
         "en": "EN",
         "ru": "RU"
@@ -23,7 +23,7 @@
     },
     "login": {
       "title": "GoCMS Login",
-      "subtitle": "Use fixture credentials: admin@example.test / admin.",
+      "subtitle": "Coming soon",
       "error_invalid_credentials": "Invalid credentials."
     },
     "navigation": [
@@ -233,6 +233,8 @@
       "action_previous": "Previous",
       "action_next": "Next",
       "field_email": "Email",
+      "field_avatar_media_id": "Avatar media ID",
+      "field_avatar_media_id_placeholder": "Media library asset ID (same pattern as featured media on posts)",
       "field_password": "Password",
       "field_site_title": "Site title",
       "field_public_rendering": "Public rendering",

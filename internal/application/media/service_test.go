@@ -22,12 +22,12 @@ func TestMediaMetadataAndFeaturedAttachment(t *testing.T) {
 
 	asset := domainmedia.Asset{
 		ID:        "asset-1",
-		Filename:  "cover.jpg",
-		MimeType:  "image/jpeg",
-		PublicURL: "/media/cover.jpg",
+		Filename:  "go-cms-itgarage.webp",
+		MimeType:  "image/webp",
+		PublicURL: "/static/img/go-cms-itgarage.webp",
 		ProviderRef: domainmedia.BlobRef{
 			Provider: "fixtures",
-			Key:      "media/cover.jpg",
+			Key:      "uploads/go-cms-itgarage.webp",
 		},
 	}
 	if err := service.SaveMetadata(ctx, editor, asset); err != nil {

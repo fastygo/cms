@@ -11,6 +11,7 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 
 	appcontent "github.com/fastygo/cms/internal/application/content"
+	appmedia "github.com/fastygo/cms/internal/application/media"
 	appmeta "github.com/fastygo/cms/internal/application/meta"
 	domainauthz "github.com/fastygo/cms/internal/domain/authz"
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
@@ -282,7 +283,7 @@ func (r *rootResolver) Authors(ctx context.Context) ([]*authorResolver, error) {
 			continue
 		}
 		profile := user.PublicAuthor()
-		out = append(out, &authorResolver{profile: profile})
+		out = append(out, &authorResolver{profile: profile, media: r.services.Media})
 	}
 	return out, nil
 }
@@ -916,14 +917,26 @@ func (r *mediaVariantResolver) Height() int32 { return int32(r.item.Height) }
 
 type authorResolver struct {
 	profile domainusers.AuthorProfile
+	media   appmedia.Service
 }
 
 func (r *authorResolver) ID() graphql.ID      { return graphql.ID(r.profile.ID) }
 func (r *authorResolver) Slug() string        { return r.profile.Slug }
 func (r *authorResolver) DisplayName() string { return r.profile.DisplayName }
 func (r *authorResolver) Bio() string         { return r.profile.Bio }
-func (r *authorResolver) AvatarURL() string   { return r.profile.AvatarURL }
-func (r *authorResolver) WebsiteURL() string  { return r.profile.WebsiteURL }
+func (r *authorResolver) AvatarMediaId() string {
+	return r.profile.AvatarMediaID
+}
+func (r *authorResolver) AvatarURL(ctx context.Context) string {
+	if mid := strings.TrimSpace(r.profile.AvatarMediaID); mid != "" {
+		asset, ok, err := r.media.Get(ctx, domainmedia.ID(mid))
+		if err == nil && ok {
+			return asset.PublicURL
+		}
+	}
+	return r.profile.AvatarURL
+}
+func (r *authorResolver) WebsiteURL() string { return r.profile.WebsiteURL }
 
 type menuResolver struct {
 	item domainmenus.Menu

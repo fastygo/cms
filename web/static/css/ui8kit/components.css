@@ -329,15 +329,16 @@
   }
 
   .ui-shell-body--marketing .ui-header {
-    @apply grid grid-cols-[auto_1fr] items-center;
+    /* Three slots: menu | title (grows) | actions — matches Header template children. */
+    @apply grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2;
   }
 
   .ui-shell-body--marketing .ui-header-actions {
-    @apply grid grid-cols-[1fr_auto_auto] items-center gap-4;
+    @apply flex items-center justify-end gap-2;
   }
 
   .ui-shell-body--marketing .ui-header-title {
-    @apply pr-4;
+    @apply min-w-0 pr-4;
   }
 
   .ui-shell-body--marketing .ui-shell-nav-mobile {

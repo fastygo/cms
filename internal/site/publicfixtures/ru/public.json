@@ -1,0 +1,63 @@
+{
+  "public": {
+    "meta": { "lang": "ru" },
+    "site_defaults": {
+      "title": "GoCMS",
+      "brand_name": "GoCMS",
+      "home_hero_title": "Публичный сайт на GoCMS.",
+      "home_intro": "Ниже — последние опубликованные записи."
+    },
+    "routes": {
+      "blog_title": "Блог",
+      "blog_description": "Последние опубликованные записи.",
+      "search_title": "Поиск",
+      "search_results_base": "Результаты поиска",
+      "search_results_query": "Результаты для «%s»",
+      "not_found_title": "Страница не найдена",
+      "not_found_description": "Запрошенная страница не найдена.",
+      "not_found_action": "На главную",
+      "public_rendering_disabled": "Публичный вывод отключён.",
+      "published_prefix": "Опубликовано: "
+    },
+    "breadcrumbs": {
+      "home": "Главная",
+      "blog": "Блог",
+      "search": "Поиск",
+      "authors": "Авторы"
+    },
+    "author": {
+      "section_title": "Автор",
+      "expert_title": "Эксперт",
+      "line_prefix": "Автор: ",
+      "posts_fallback": "Записи: %s"
+    },
+    "labels": {
+      "taxonomy_archive_template": "Архив %s: %s"
+    },
+    "chrome": {
+      "empty_archive": "Публичного контента пока нет.",
+      "open_action": "Открыть",
+      "read_action": "Читать",
+      "related_title": "Похожее",
+      "related_insights_title": "Похожие материалы",
+      "no_menu_items": "Пункты меню не настроены.",
+      "query_badge_template": "Запрос: «%s»",
+      "by_author_prefix": "Автор: ",
+      "theme_preset_badge": "Тема: %s | Пресет: %s",
+      "footer_thanks": "Спасибо вам за творчество с GoCMS."
+    },
+    "pagination": {
+      "previous": "Назад",
+      "next": "Вперёд"
+    },
+    "menus": {
+      "menu-home": "Главная",
+      "menu-blog": "Блог",
+      "menu-blog-news": "Новости",
+      "menu-about": "О проекте",
+      "menu-footer-home": "Главная",
+      "menu-footer-resources": "Материалы",
+      "menu-footer-author": "Mr Gopher"
+    }
+  }
+}

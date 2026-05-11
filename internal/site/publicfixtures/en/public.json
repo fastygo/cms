@@ -1,0 +1,63 @@
+{
+  "public": {
+    "meta": { "lang": "en" },
+    "site_defaults": {
+      "title": "GoCMS",
+      "brand_name": "GoCMS",
+      "home_hero_title": "Public site powered by GoCMS.",
+      "home_intro": "Latest fixtures and published posts below."
+    },
+    "routes": {
+      "blog_title": "Blog",
+      "blog_description": "Latest published posts.",
+      "search_title": "Search",
+      "search_results_base": "Search results",
+      "search_results_query": "Results for \"%s\"",
+      "not_found_title": "Not Found",
+      "not_found_description": "The requested page could not be found.",
+      "not_found_action": "Go home",
+      "public_rendering_disabled": "Public rendering is disabled.",
+      "published_prefix": "Published: "
+    },
+    "breadcrumbs": {
+      "home": "Home",
+      "blog": "Blog",
+      "search": "Search",
+      "authors": "Authors"
+    },
+    "author": {
+      "section_title": "Author",
+      "expert_title": "Expert",
+      "line_prefix": "Author: ",
+      "posts_fallback": "Posts by %s"
+    },
+    "labels": {
+      "taxonomy_archive_template": "Archive for %s: %s"
+    },
+    "chrome": {
+      "empty_archive": "No public content is available yet.",
+      "open_action": "Open",
+      "read_action": "Read",
+      "related_title": "Related",
+      "related_insights_title": "Related insights",
+      "no_menu_items": "No menu items configured.",
+      "query_badge_template": "Query: \"%s\"",
+      "by_author_prefix": "By ",
+      "theme_preset_badge": "Theme: %s | Preset: %s",
+      "footer_thanks": "Thank you for creating with GoCMS."
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "menus": {
+      "menu-home": "Home",
+      "menu-blog": "Blog",
+      "menu-blog-news": "News",
+      "menu-about": "About",
+      "menu-footer-home": "Home",
+      "menu-footer-resources": "Resources",
+      "menu-footer-author": "Mr Gopher"
+    }
+  }
+}

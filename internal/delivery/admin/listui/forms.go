@@ -229,6 +229,7 @@ func BuildUserQuickEditForm(bundle adminfixtures.AdminFixture, state State, base
 			}},
 			{ID: "login", Name: "login", Label: bundle.Label("field_login", "Login"), Value: item.Login, Required: true},
 			{ID: "display_name", Name: "display_name", Label: bundle.Label("field_display_name", "Display name"), Value: item.DisplayName, Required: true},
+			{ID: "avatar_media_id", Name: "avatar_media_id", Label: bundle.Label("field_avatar_media_id", "Avatar media ID"), Value: item.Profile.AvatarMediaID, Placeholder: bundle.Label("field_avatar_media_id_placeholder", "Media library asset ID (same pattern as featured media on posts)")},
 			{ID: "email", Name: "email", Label: bundle.Label("field_email", "Email"), Value: item.Email, Required: true},
 			{ID: "status", Name: "status", Label: bundle.Label("field_status", "Status"), Value: string(item.Status), Component: "select", Options: []ui.FieldOption{{Value: "active", Label: "Active"}, {Value: "suspended", Label: "Suspended"}, {Value: "deleted", Label: "Deleted"}}},
 			{ID: "new_password", Name: "new_password", Label: bundle.Label("field_new_password", "New password"), Type: "password"},

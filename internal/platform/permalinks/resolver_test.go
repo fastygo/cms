@@ -46,8 +46,8 @@ func TestResolveSupportsSearchAndTaxonomyArchives(t *testing.T) {
 		t.Fatalf("slug = %q", got)
 	}
 
-	author := Resolve("/author/jane/", url.Values{}, Settings{})
-	if len(author) != 1 || author[0].Kind != CandidateAuthor || author[0].Slug != "jane" {
+	author := Resolve("/author/mr-gopher/", url.Values{}, Settings{})
+	if len(author) != 1 || author[0].Kind != CandidateAuthor || author[0].Slug != "mr-gopher" {
 		t.Fatalf("unexpected author candidate: %+v", author)
 	}
 }
@@ -79,6 +79,23 @@ func TestEntryPathBuildsPrettyLinks(t *testing.T) {
 	}
 	if got := EntryPath(post, Settings{PostPattern: "/archives/%id%/"}); got != "/archives/post-1/" {
 		t.Fatalf("id post path = %q", got)
+	}
+}
+
+func TestEntryPathUsesRussianSlugWhenEnglishMissing(t *testing.T) {
+	publishedAt := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	post := domaincontent.Entry{
+		ID:          "post-ru",
+		Kind:        domaincontent.KindPost,
+		Slug:        domaincontent.LocalizedText{"ru": "welcome-to-garage"},
+		CreatedAt:   publishedAt,
+		PublishedAt: &publishedAt,
+	}
+	if got := EntryPath(post, Settings{}); got != "/welcome-to-garage/" {
+		t.Fatalf("post path = %q, want /welcome-to-garage/", got)
+	}
+	if !MatchesEntry(Candidate{Kind: CandidatePostSlug, Slug: "welcome-to-garage"}, post) {
+		t.Fatal("expected URL slug to match ru-only LocalizedText slug")
 	}
 }
 

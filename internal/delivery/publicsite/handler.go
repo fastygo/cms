@@ -13,11 +13,12 @@ import (
 	apptaxonomy "github.com/fastygo/cms/internal/application/taxonomy"
 	appusers "github.com/fastygo/cms/internal/application/users"
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
+	"github.com/fastygo/cms/internal/platform/locales"
 	"github.com/fastygo/cms/internal/platform/permalinks"
 	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
+	"github.com/fastygo/cms/internal/site/publicfixtures"
 	"github.com/fastygo/framework/pkg/web"
-	"github.com/fastygo/framework/pkg/web/locale"
 )
 
 type Services struct {
@@ -59,7 +60,8 @@ func (h Handler) Register(mux *http.ServeMux) {
 func (h Handler) handle(w http.ResponseWriter, r *http.Request) {
 	config := h.loadConfig(r)
 	if strings.EqualFold(config.PublicRendering, "disabled") {
-		h.renderPage(w, r, h.assembler.notFound(r, config, "Public rendering is disabled."), http.StatusNotFound)
+		pub := publicfixtures.MustLoad(locales.FromContext(r.Context()))
+		h.renderPage(w, r, h.assembler.notFound(r, config, pub.Routes.PublicRenderingDisabled), http.StatusNotFound)
 		return
 	}
 
@@ -133,7 +135,7 @@ func (h Handler) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.renderPage(w, r, h.assembler.notFound(r, config, "The requested page was not found."), http.StatusNotFound)
+	h.renderPage(w, r, h.assembler.notFound(r, config, ""), http.StatusNotFound)
 }
 
 func (h Handler) renderPage(w http.ResponseWriter, r *http.Request, request publicrender.RenderRequest, status int) {
@@ -141,7 +143,7 @@ func (h Handler) renderPage(w http.ResponseWriter, r *http.Request, request publ
 		filtered, err := platformplugins.FilterValue(r.Context(), h.registry, "render.content.filter", platformplugins.HookContext{
 			Surface: pluginsSurfacePublic(),
 			Path:    r.URL.Path,
-			Locale:  locale.From(r.Context()),
+			Locale:  locales.FromContext(r.Context()),
 			Metadata: map[string]any{
 				"screen": string(request.Page.Screen),
 				"kind":   string(request.Page.Kind),
@@ -163,10 +165,12 @@ func (h Handler) renderPage(w http.ResponseWriter, r *http.Request, request publ
 }
 
 func (h Handler) loadConfig(r *http.Request) publicrender.SiteConfig {
+	pub := publicfixtures.MustLoad(locales.FromContext(r.Context()))
 	config := publicrender.SiteConfig{
-		Title:           "GoCMS",
-		BrandName:       "GoCMS",
-		HomeIntro:       "Public site powered by GoCMS.",
+		Title:           pub.SiteDefaults.Title,
+		BrandName:       pub.SiteDefaults.BrandName,
+		HomeHeroTitle:   pub.SiteDefaults.HomeHeroTitle,
+		HomeIntro:       pub.SiteDefaults.HomeIntro,
 		ActiveTheme:     string(platformthemes.DefaultThemeID),
 		StylePreset:     "default",
 		PublicRendering: "enabled",
@@ -180,6 +184,9 @@ func (h Handler) loadConfig(r *http.Request) publicrender.SiteConfig {
 	}
 	if value, ok, err := h.services.Settings.Get(r.Context(), domainsettings.Key("theme.home_intro")); err == nil && ok {
 		config.HomeIntro = settingString(value, config.HomeIntro)
+	}
+	if value, ok, err := h.services.Settings.Get(r.Context(), domainsettings.Key("theme.home_hero_title")); err == nil && ok {
+		config.HomeHeroTitle = settingString(value, config.HomeHeroTitle)
 	}
 	if value, ok, err := h.services.Settings.Get(r.Context(), domainsettings.Key(platformthemes.ActiveThemeKey)); err == nil && ok {
 		config.ActiveTheme = settingString(value, config.ActiveTheme)

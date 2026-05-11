@@ -146,6 +146,7 @@ type Author {
   displayName: String!
   bio: String!
   avatarURL: String!
+  avatarMediaId: String!
   websiteURL: String!
 }
 

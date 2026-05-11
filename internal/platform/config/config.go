@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fastygo/cms/internal/platform/locales"
 	"github.com/fastygo/cms/internal/platform/preset"
 	"github.com/fastygo/cms/internal/platform/runtimeprofile"
 	"github.com/fastygo/framework/pkg/app"
@@ -94,6 +95,17 @@ func applyDefaults(cfg *app.Config) {
 	if cfg.StaticDir == "" || cfg.StaticDir == frameworkStaticDir {
 		cfg.StaticDir = resolveDefaultStaticDir()
 	}
+	if cfg.DefaultLocale == "" {
+		cfg.DefaultLocale = locales.Default
+	}
+	if len(cfg.AvailableLocales) == 0 {
+		cfg.AvailableLocales = locales.Supported()
+	} else {
+		cfg.AvailableLocales = normalizeFrameworkLocales(cfg.DefaultLocale, cfg.AvailableLocales)
+	}
+	if !containsLocale(cfg.AvailableLocales, cfg.DefaultLocale) {
+		cfg.AvailableLocales = append([]string{cfg.DefaultLocale}, cfg.AvailableLocales...)
+	}
 }
 
 func resolveDefaultStaticDir() string {
@@ -120,7 +132,45 @@ func validate(cfg app.Config) error {
 	if len(cfg.AvailableLocales) == 0 {
 		return fmt.Errorf("at least one available locale is required")
 	}
+	if !containsLocale(cfg.AvailableLocales, cfg.DefaultLocale) {
+		return fmt.Errorf("default locale %q must be included in available locales", cfg.DefaultLocale)
+	}
 	return nil
+}
+
+func normalizeFrameworkLocales(defaultLocale string, raw []string) []string {
+	def := locales.NormalizeOrDefault(defaultLocale)
+	out := make([]string, 0, len(raw)+1)
+	seen := map[string]struct{}{}
+	add := func(code string) {
+		code = locales.Normalize(code)
+		if !locales.IsSupported(code) {
+			return
+		}
+		if _, ok := seen[code]; ok {
+			return
+		}
+		seen[code] = struct{}{}
+		out = append(out, code)
+	}
+	add(def)
+	for _, v := range raw {
+		add(v)
+	}
+	if len(out) == 0 {
+		return locales.Supported()
+	}
+	return out
+}
+
+func containsLocale(list []string, target string) bool {
+	t := locales.Normalize(target)
+	for _, v := range list {
+		if locales.Normalize(v) == t {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeRuntimeProfile(raw string) string {

@@ -15,16 +15,18 @@ import (
 
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domainsettings "github.com/fastygo/cms/internal/domain/settings"
+	"github.com/fastygo/cms/internal/platform/locales"
 	platformplugins "github.com/fastygo/cms/internal/platform/plugins"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	frameworkapp "github.com/fastygo/framework/pkg/app"
+	"github.com/fastygo/framework/pkg/web/locale"
 )
 
 func TestFullProfileExposesPublicRoutesAndPublishedContent(t *testing.T) {
-	mux, closeFn := newPublicMux(t, "full", nil)
+	handler, closeFn := newPublicMux(t, "full", nil)
 	defer closeFn()
 
-	home := requestPublic(mux, http.MethodGet, "/", "", "")
+	home := requestPublic(handler, http.MethodGet, "/", "", "")
 	if home.Code != http.StatusOK {
 		t.Fatalf("home status = %d body = %s", home.Code, home.Body.String())
 	}
@@ -34,10 +36,10 @@ func TestFullProfileExposesPublicRoutesAndPublishedContent(t *testing.T) {
 		`data-gocms-public-header="gocms-default"`,
 		`data-gocms-menu-location="header"`,
 		`data-gocms-menu-location="footer"`,
-		"GoCMS Fixture",
+		"GoCMS",
 		"Published Post",
 		"News",
-		"Author Jane",
+		"Mr Gopher",
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected home page to contain %q", expected)
@@ -49,18 +51,18 @@ func TestFullProfileExposesPublicRoutesAndPublishedContent(t *testing.T) {
 		}
 	}
 
-	page := requestPublic(mux, http.MethodGet, "/about/", "", "")
+	page := requestPublic(handler, http.MethodGet, "/about/", "", "")
 	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "About page fixture") {
 		t.Fatalf("page response = %d body = %s", page.Code, page.Body.String())
 	}
 
-	post := requestPublic(mux, http.MethodGet, "/published-post/", "", "")
+	post := requestPublic(handler, http.MethodGet, "/published-post/", "", "")
 	if post.Code != http.StatusOK || !strings.Contains(post.Body.String(), "Public fixture content") {
 		t.Fatalf("post response = %d body = %s", post.Code, post.Body.String())
 	}
 	for _, expected := range []string{
-		"/media/cover.jpg",
-		"Jane Editor",
+		"/static/img/go-cms-itgarage.webp",
+		"Mr Gopher",
 		`data-gocms-breadcrumbs="public"`,
 		`property="og:title"`,
 		`rel="canonical"`,
@@ -70,34 +72,93 @@ func TestFullProfileExposesPublicRoutesAndPublishedContent(t *testing.T) {
 		}
 	}
 
-	blog := requestPublic(mux, http.MethodGet, "/blog/", "", "")
+	blog := requestPublic(handler, http.MethodGet, "/blog/", "", "")
 	if blog.Code != http.StatusOK || !strings.Contains(blog.Body.String(), `data-gocms-public-screen="blog"`) {
 		t.Fatalf("blog response = %d body = %s", blog.Code, blog.Body.String())
 	}
 
-	search := requestPublic(mux, http.MethodGet, "/search?q=Published", "", "")
+	search := requestPublic(handler, http.MethodGet, "/search?q=Published", "", "")
 	if search.Code != http.StatusOK || !strings.Contains(search.Body.String(), "Published Post") {
 		t.Fatalf("search response = %d body = %s", search.Code, search.Body.String())
 	}
 
-	taxonomy := requestPublic(mux, http.MethodGet, "/category/news/", "", "")
+	taxonomy := requestPublic(handler, http.MethodGet, "/category/news/", "", "")
 	if taxonomy.Code != http.StatusOK || !strings.Contains(taxonomy.Body.String(), "Published Post") {
 		t.Fatalf("taxonomy response = %d body = %s", taxonomy.Code, taxonomy.Body.String())
 	}
 
-	author := requestPublic(mux, http.MethodGet, "/author/jane/", "", "")
+	author := requestPublic(handler, http.MethodGet, "/author/mr-gopher/", "", "")
 	if author.Code != http.StatusOK || !strings.Contains(author.Body.String(), "Published Post") {
 		t.Fatalf("author response = %d body = %s", author.Code, author.Body.String())
 	}
+	if !strings.Contains(author.Body.String(), "/static/img/gosms-banner.png") {
+		t.Fatalf("expected author page to show avatar resolved from AvatarMediaID (fixture media-avatar), body head: %s", author.Body.String()[:min(800, len(author.Body.String()))])
+	}
 
-	draft := requestPublic(mux, http.MethodGet, "/draft-post/", "", "")
+	draft := requestPublic(handler, http.MethodGet, "/draft-post/", "", "")
 	if draft.Code != http.StatusNotFound {
 		t.Fatalf("draft should not render publicly, got %d", draft.Code)
 	}
 
-	scheduled := requestPublic(mux, http.MethodGet, "/scheduled-post/", "", "")
+	scheduled := requestPublic(handler, http.MethodGet, "/scheduled-post/", "", "")
 	if scheduled.Code != http.StatusNotFound {
 		t.Fatalf("scheduled should not render publicly, got %d", scheduled.Code)
+	}
+}
+
+func TestPublicSiteUsesRussianAsDefaultWhenAcceptLanguageOmitted(t *testing.T) {
+	handler, closeFn := newPublicMux(t, "full", nil)
+	defer closeFn()
+
+	home := requestPublicRaw(handler, http.MethodGet, "/", "", "")
+	if home.Code != http.StatusOK {
+		t.Fatalf("home status = %d body = %s", home.Code, home.Body.String())
+	}
+	body := home.Body.String()
+	if !strings.Contains(body, `lang="ru"`) {
+		head := body
+		if len(head) > 400 {
+			head = head[:400]
+		}
+		t.Fatalf("expected html lang=ru, body head: %s", head)
+	}
+	for _, want := range []string{"Опубликованная запись", "Новости", "Блог", "Публичный сайт на GoCMS."} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected home to contain %q", want)
+		}
+	}
+	for _, avoid := range []string{"Published Post"} {
+		if strings.Contains(body, avoid) {
+			t.Fatalf("did not expect default-locale home to contain %q", avoid)
+		}
+	}
+}
+
+func TestPublicSiteEnglishLocalePrefixRendersEnglishCopy(t *testing.T) {
+	handler, closeFn := newPublicMux(t, "full", nil)
+	defer closeFn()
+
+	home := requestPublicRaw(handler, http.MethodGet, "/en/", "", "")
+	if home.Code != http.StatusOK {
+		t.Fatalf("home status = %d body = %s", home.Code, home.Body.String())
+	}
+	body := home.Body.String()
+	if !strings.Contains(body, `lang="en"`) {
+		head := body
+		if len(head) > 400 {
+			head = head[:400]
+		}
+		t.Fatalf("expected html lang=en under /en/, excerpt: %s", head)
+	}
+	if !strings.Contains(body, "Published Post") || !strings.Contains(body, "News") {
+		head := body
+		if len(head) > 600 {
+			head = head[:600]
+		}
+		t.Fatalf("expected English fixture strings on /en/ home, excerpt: %s", head)
+	}
+	if !strings.Contains(body, "Public site powered by GoCMS.") {
+		t.Fatalf("expected English public fixture home hero headline on /en/")
 	}
 }
 
@@ -108,8 +169,9 @@ func TestPublicThemePreviewAndActivationAffectRender(t *testing.T) {
 	})
 	mux := http.NewServeMux()
 	module.Routes(mux)
+	handler := wrapPublicLocale(mux)
 
-	preview := requestPublic(mux, http.MethodGet, "/?preview_theme=blank&preview_preset=minimal", "", "")
+	preview := requestPublic(handler, http.MethodGet, "/?preview_theme=blank&preview_preset=minimal", "", "")
 	if preview.Code != http.StatusOK || !strings.Contains(preview.Body.String(), `data-gocms-theme="blank"`) {
 		t.Fatalf("preview response = %d body = %s", preview.Code, preview.Body.String())
 	}
@@ -121,7 +183,7 @@ func TestPublicThemePreviewAndActivationAffectRender(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	activated := requestPublic(mux, http.MethodGet, "/", "", "")
+	activated := requestPublic(handler, http.MethodGet, "/", "", "")
 	if activated.Code != http.StatusOK || !strings.Contains(activated.Body.String(), `data-gocms-theme="blank"`) {
 		t.Fatalf("activated response = %d body = %s", activated.Code, activated.Body.String())
 	}
@@ -146,8 +208,9 @@ func TestPublicContentBodyRendersHTMLInsideProse(t *testing.T) {
 
 	mux := http.NewServeMux()
 	module.Routes(mux)
+	handler := wrapPublicLocale(mux)
 
-	post := requestPublic(mux, http.MethodGet, "/published-post/", "", "")
+	post := requestPublic(handler, http.MethodGet, "/published-post/", "", "")
 	if post.Code != http.StatusOK {
 		t.Fatalf("post response = %d body = %s", post.Code, post.Body.String())
 	}
@@ -207,7 +270,8 @@ func TestPublicRenderFilterAppliesAtSafeOutputBoundary(t *testing.T) {
 
 	mux := http.NewServeMux()
 	module.Routes(mux)
-	post := requestPublic(mux, http.MethodGet, "/published-post/", "", "")
+	handler := wrapPublicLocale(mux)
+	post := requestPublic(handler, http.MethodGet, "/published-post/", "", "")
 	if post.Code != http.StatusOK {
 		t.Fatalf("post response = %d body = %s", post.Code, post.Body.String())
 	}
@@ -229,8 +293,9 @@ func TestPublicArchivesExposePaginationWithoutPrivateLeaks(t *testing.T) {
 	seedAdditionalPublishedPosts(t, module, 12)
 	mux := http.NewServeMux()
 	module.Routes(mux)
+	handler := wrapPublicLocale(mux)
 
-	pageOne := requestPublic(mux, http.MethodGet, "/blog/", "", "")
+	pageOne := requestPublic(handler, http.MethodGet, "/blog/", "", "")
 	if pageOne.Code != http.StatusOK {
 		t.Fatalf("page one status = %d body = %s", pageOne.Code, pageOne.Body.String())
 	}
@@ -245,17 +310,17 @@ func TestPublicArchivesExposePaginationWithoutPrivateLeaks(t *testing.T) {
 		}
 	}
 
-	pageTwo := requestPublic(mux, http.MethodGet, "/blog/?page=2", "", "")
+	pageTwo := requestPublic(handler, http.MethodGet, "/blog/?page=2", "", "")
 	if pageTwo.Code != http.StatusOK || !strings.Contains(pageTwo.Body.String(), "Extra Published 02") || !strings.Contains(pageTwo.Body.String(), "Published Post") {
 		t.Fatalf("page two status = %d body = %s", pageTwo.Code, pageTwo.Body.String())
 	}
 }
 
 func TestHeadlessProfileDoesNotExposePublicRenderer(t *testing.T) {
-	mux, closeFn := newPublicMux(t, "headless", nil)
+	handler, closeFn := newPublicMux(t, "headless", nil)
 	defer closeFn()
 
-	rec := requestPublic(mux, http.MethodGet, "/", "", "")
+	rec := requestPublic(handler, http.MethodGet, "/", "", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("headless public route = %d, want 404", rec.Code)
 	}
@@ -269,19 +334,20 @@ func TestPublicCatchAllDoesNotSwallowSystemRoutes(t *testing.T) {
 
 	mux := http.NewServeMux()
 	module.Routes(mux)
+	handler := wrapPublicLocale(mux)
 
-	admin := requestPublic(mux, http.MethodGet, "/go-admin", "", "")
+	admin := requestPublic(handler, http.MethodGet, "/go-admin", "", "")
 	if admin.Code != http.StatusSeeOther {
 		t.Fatalf("/go-admin status = %d body = %s", admin.Code, admin.Body.String())
 	}
 
-	rest := requestPublic(mux, http.MethodGet, "/go-json/go/v2/posts/by-slug/published-post", "", "")
+	rest := requestPublic(handler, http.MethodGet, "/go-json/go/v2/posts/by-slug/published-post", "", "")
 	if rest.Code != http.StatusOK {
 		t.Fatalf("/go-json status = %d body = %s", rest.Code, rest.Body.String())
 	}
 
 	graphqlBody, _ := json.Marshal(map[string]any{"query": `query { post(slug: "published-post") { id } }`})
-	graphql := requestPublic(mux, http.MethodPost, "/go-graphql", string(graphqlBody), "")
+	graphql := requestPublic(handler, http.MethodPost, "/go-graphql", string(graphqlBody), "")
 	if graphql.Code != http.StatusOK {
 		t.Fatalf("/go-graphql status = %d body = %s", graphql.Code, graphql.Body.String())
 	}
@@ -306,14 +372,23 @@ func TestPublicCatchAllDoesNotSwallowSystemRoutes(t *testing.T) {
 	}
 }
 
-func newPublicMux(t *testing.T, runtimeProfile string, activePlugins []string) (*http.ServeMux, func()) {
+func newPublicMux(t *testing.T, runtimeProfile string, activePlugins []string) (http.Handler, func()) {
 	t.Helper()
 	module := newModuleForPublicTests(t, runtimeProfile, activePlugins)
 	mux := http.NewServeMux()
 	module.Routes(mux)
-	return mux, func() {
+	return wrapPublicLocale(mux), func() {
 		_ = module.Close(t.Context())
 	}
+}
+
+func wrapPublicLocale(next http.Handler) http.Handler {
+	strategy := &locale.PathPrefixStrategy{
+		Available:       locales.Supported(),
+		Default:         locales.Default,
+		RedirectMissing: false,
+	}
+	return locale.MiddlewareWithSPAMode(strategy, true)(next)
 }
 
 func newModuleForPublicTests(t *testing.T, runtimeProfile string, activePlugins []string) *Module {
@@ -366,6 +441,23 @@ func requestPublic(handler http.Handler, method string, path string, body string
 	if authorization != "" {
 		req.Header.Set("Authorization", authorization)
 	}
+	if req.Header.Get("Accept-Language") == "" {
+		req.Header.Set("Accept-Language", "en")
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec
+}
+
+// requestPublicRaw does not set Accept-Language, so negotiation falls back to the app default locale.
+func requestPublicRaw(handler http.Handler, method string, path string, body string, authorization string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
@@ -386,10 +478,10 @@ func seedAdditionalPublishedPosts(t *testing.T, module *Module, count int) {
 			Kind:        domaincontent.KindPost,
 			Status:      domaincontent.StatusPublished,
 			Visibility:  domaincontent.VisibilityPublic,
-			Title:       domaincontent.LocalizedText{"en": "Extra Published " + twoDigits(i)},
-			Slug:        domaincontent.LocalizedText{"en": "extra-published-" + twoDigits(i)},
-			Body:        domaincontent.LocalizedText{"en": "Extra body " + twoDigits(i)},
-			Excerpt:     domaincontent.LocalizedText{"en": "Extra excerpt " + twoDigits(i)},
+			Title:       domaincontent.LocalizedText{"en": "Extra Published " + twoDigits(i), "ru": "Доп. публикация " + twoDigits(i)},
+			Slug:        domaincontent.LocalizedText{"en": "extra-published-" + twoDigits(i), "ru": "extra-published-" + twoDigits(i)},
+			Body:        domaincontent.LocalizedText{"en": "Extra body " + twoDigits(i), "ru": "Доп. текст " + twoDigits(i)},
+			Excerpt:     domaincontent.LocalizedText{"en": "Extra excerpt " + twoDigits(i), "ru": "Доп. выдержка " + twoDigits(i)},
 			AuthorID:    "author-1",
 			CreatedAt:   publishedAt.Add(-time.Hour),
 			UpdatedAt:   publishedAt,

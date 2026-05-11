@@ -1,6 +1,7 @@
 package publicsite
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -12,14 +13,15 @@ import (
 	domaincontent "github.com/fastygo/cms/internal/domain/content"
 	domainmedia "github.com/fastygo/cms/internal/domain/media"
 	domainmenus "github.com/fastygo/cms/internal/domain/menus"
-	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	domaintaxonomy "github.com/fastygo/cms/internal/domain/taxonomy"
+	domainthemes "github.com/fastygo/cms/internal/domain/themes"
 	domainusers "github.com/fastygo/cms/internal/domain/users"
+	"github.com/fastygo/cms/internal/platform/locales"
 	"github.com/fastygo/cms/internal/platform/permalinks"
 	platformthemes "github.com/fastygo/cms/internal/platform/themes"
 	"github.com/fastygo/cms/internal/site/adminfixtures"
 	"github.com/fastygo/cms/internal/site/assets"
-	"github.com/fastygo/framework/pkg/web/locale"
+	"github.com/fastygo/cms/internal/site/publicfixtures"
 	"github.com/fastygo/framework/pkg/web/view"
 )
 
@@ -32,8 +34,19 @@ func newPageAssembler(services Services, themes *platformthemes.Registry) pageAs
 	return pageAssembler{services: services, themes: themes}
 }
 
+func (a pageAssembler) pub(r *http.Request) publicfixtures.PublicSite {
+	return publicfixtures.MustLoad(locales.FromContext(r.Context()))
+}
+
+func (a pageAssembler) locFB(r *http.Request) (active string, fallback string) {
+	active = locales.FromContext(r.Context())
+	return active, locales.ContentFallback(active)
+}
+
 func (a pageAssembler) home(r *http.Request, config publicrender.SiteConfig) (publicrender.RenderRequest, error) {
 	page := parsePage(r, 1)
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	result, err := a.services.Content.List(r.Context(), domaincontent.Query{
 		Kinds:      []domaincontent.Kind{domaincontent.KindPost},
 		PublicOnly: true,
@@ -45,21 +58,25 @@ func (a pageAssembler) home(r *http.Request, config publicrender.SiteConfig) (pu
 	if err != nil {
 		return publicrender.RenderRequest{}, err
 	}
+	heroTitle := firstNonEmpty(config.HomeHeroTitle, config.Title)
 	return a.renderRequest(r, config, publicrender.PublicPage{
-		Kind:         publicrender.RenderKindHome,
-		Screen:       "home",
-		TemplateRole: "front",
-		Title:        config.Title,
-		Description:  config.HomeIntro,
-		Intro:        config.HomeIntro,
-		Pagination:   paginationData("/", page, result.TotalPages),
-		Items:        a.archiveItems(r, result.Items, config.Permalinks),
-		SEO:          seoModel(config.Title, config.HomeIntro, "/", "website", nil, time.Time{}, time.Time{}, false),
+		Kind:          publicrender.RenderKindHome,
+		Screen:        "home",
+		TemplateRole:  "front",
+		DocumentTitle: config.Title,
+		Title:         heroTitle,
+		Description:   config.HomeIntro,
+		Intro:         config.HomeIntro,
+		Pagination:    paginationData("/", page, result.TotalPages, pub.Pagination.Previous, pub.Pagination.Next),
+		Items:         a.archiveItems(r, result.Items, config.Permalinks, active, fb),
+		SEO:           seoModel(heroTitle, config.HomeIntro, "/", "website", nil, time.Time{}, time.Time{}, false),
 	}, "/")
 }
 
 func (a pageAssembler) blog(r *http.Request, config publicrender.SiteConfig) (publicrender.RenderRequest, error) {
 	page := parsePage(r, 1)
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	result, err := a.services.Content.List(r.Context(), domaincontent.Query{
 		Kinds:      []domaincontent.Kind{domaincontent.KindPost},
 		PublicOnly: true,
@@ -75,17 +92,22 @@ func (a pageAssembler) blog(r *http.Request, config publicrender.SiteConfig) (pu
 		Kind:         publicrender.RenderKindBlog,
 		Screen:       "blog",
 		TemplateRole: "archive",
-		Title:        "Blog",
-		Description:  "Latest published posts.",
-		Pagination:   paginationData("/blog/", page, result.TotalPages),
-		Breadcrumbs:  []publicrender.Breadcrumb{{Label: "Home", URL: "/"}, {Label: "Blog", URL: "/blog/"}},
-		Items:        a.archiveItems(r, result.Items, config.Permalinks),
-		SEO:          seoModel("Blog", "Latest published posts.", "/blog/", "website", nil, time.Time{}, time.Time{}, false),
+		Title:        pub.Routes.BlogTitle,
+		Description:  pub.Routes.BlogDescription,
+		Pagination:   paginationData("/blog/", page, result.TotalPages, pub.Pagination.Previous, pub.Pagination.Next),
+		Breadcrumbs: []publicrender.Breadcrumb{
+			{Label: pub.Breadcrumbs.Home, URL: "/"},
+			{Label: pub.Breadcrumbs.Blog, URL: "/blog/"},
+		},
+		Items: a.archiveItems(r, result.Items, config.Permalinks, active, fb),
+		SEO:   seoModel(pub.Routes.BlogTitle, pub.Routes.BlogDescription, "/blog/", "website", nil, time.Time{}, time.Time{}, false),
 	}, "/blog/")
 }
 
 func (a pageAssembler) search(r *http.Request, config publicrender.SiteConfig, candidate permalinks.Candidate) (publicrender.RenderRequest, error) {
 	page := parsePage(r, 1)
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	result, err := a.services.Content.List(r.Context(), domaincontent.Query{
 		Kinds:      []domaincontent.Kind{domaincontent.KindPost, domaincontent.KindPage},
 		PublicOnly: true,
@@ -98,25 +120,33 @@ func (a pageAssembler) search(r *http.Request, config publicrender.SiteConfig, c
 	if err != nil {
 		return publicrender.RenderRequest{}, err
 	}
-	description := "Search results"
+	description := pub.Routes.SearchResultsBase
 	if strings.TrimSpace(candidate.Query) != "" {
-		description = `Results for "` + candidate.Query + `"`
+		description = fmt.Sprintf(pub.Routes.SearchResultsQuery, candidate.Query)
 	}
 	canonical := "/search/"
 	if strings.TrimSpace(candidate.Query) != "" {
 		canonical += "?q=" + url.QueryEscape(candidate.Query)
 	}
+	queryBadge := ""
+	if strings.TrimSpace(candidate.Query) != "" {
+		queryBadge = fmt.Sprintf(pub.Chrome.QueryBadgeTemplate, candidate.Query)
+	}
 	return a.renderRequest(r, config, publicrender.PublicPage{
 		Kind:         publicrender.RenderKindSearch,
 		Screen:       "search",
 		TemplateRole: "search",
-		Title:        "Search",
+		Title:        pub.Routes.SearchTitle,
 		Description:  description,
 		Query:        candidate.Query,
-		Pagination:   paginationData(searchBase(candidate.Query), page, result.TotalPages),
-		Breadcrumbs:  []publicrender.Breadcrumb{{Label: "Home", URL: "/"}, {Label: "Search", URL: canonical}},
-		Items:        a.archiveItems(r, result.Items, config.Permalinks),
-		SEO:          seoModel("Search", description, canonical, "website", nil, time.Time{}, time.Time{}, true),
+		QueryBadge:   queryBadge,
+		Pagination:   paginationData(searchBase(candidate.Query), page, result.TotalPages, pub.Pagination.Previous, pub.Pagination.Next),
+		Breadcrumbs: []publicrender.Breadcrumb{
+			{Label: pub.Breadcrumbs.Home, URL: "/"},
+			{Label: pub.Breadcrumbs.Search, URL: canonical},
+		},
+		Items: a.archiveItems(r, result.Items, config.Permalinks, active, fb),
+		SEO:   seoModel(pub.Routes.SearchTitle, description, canonical, "website", nil, time.Time{}, time.Time{}, true),
 	}, "/search/")
 }
 
@@ -126,6 +156,8 @@ func (a pageAssembler) taxonomy(r *http.Request, config publicrender.SiteConfig,
 		return publicrender.RenderRequest{}, false, nil
 	}
 	page := parsePage(r, 1)
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	result, err := a.services.Content.List(r.Context(), domaincontent.Query{
 		Kinds:      []domaincontent.Kind{domaincontent.KindPost},
 		PublicOnly: true,
@@ -139,10 +171,10 @@ func (a pageAssembler) taxonomy(r *http.Request, config publicrender.SiteConfig,
 	if err != nil {
 		return publicrender.RenderRequest{}, true, err
 	}
-	title := term.Name.Value(locale.From(r.Context()), "en")
-	description := term.Description.Value(locale.From(r.Context()), "en")
+	title := term.Name.Value(active, fb)
+	description := term.Description.Value(active, fb)
 	if description == "" {
-		description = "Archive for " + candidate.Taxonomy + ": " + title
+		description = fmt.Sprintf(pub.Labels.TaxonomyArchiveTemplate, candidate.Taxonomy, title)
 	}
 	path := candidate.Path
 	request, err := a.renderRequest(r, config, publicrender.PublicPage{
@@ -151,11 +183,14 @@ func (a pageAssembler) taxonomy(r *http.Request, config publicrender.SiteConfig,
 		TemplateRole: "taxonomy",
 		Title:        title,
 		Description:  description,
-		CurrentTerm:  a.termView(term),
-		Pagination:   paginationData(path, page, result.TotalPages),
-		Breadcrumbs:  []publicrender.Breadcrumb{{Label: "Home", URL: "/"}, {Label: title, URL: path}},
-		Items:        a.archiveItems(r, result.Items, config.Permalinks),
-		SEO:          seoModel(title, description, path, "website", nil, time.Time{}, time.Time{}, false),
+		CurrentTerm:  a.termView(r, term),
+		Pagination:   paginationData(path, page, result.TotalPages, pub.Pagination.Previous, pub.Pagination.Next),
+		Breadcrumbs: []publicrender.Breadcrumb{
+			{Label: pub.Breadcrumbs.Home, URL: "/"},
+			{Label: title, URL: path},
+		},
+		Items: a.archiveItems(r, result.Items, config.Permalinks, active, fb),
+		SEO:   seoModel(title, description, path, "website", nil, time.Time{}, time.Time{}, false),
 	}, path)
 	return request, true, err
 }
@@ -166,6 +201,8 @@ func (a pageAssembler) author(r *http.Request, config publicrender.SiteConfig, c
 		return publicrender.RenderRequest{}, false, nil
 	}
 	page := parsePage(r, 1)
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	result, err := a.services.Content.List(r.Context(), domaincontent.Query{
 		Kinds:      []domaincontent.Kind{domaincontent.KindPost},
 		PublicOnly: true,
@@ -180,26 +217,35 @@ func (a pageAssembler) author(r *http.Request, config publicrender.SiteConfig, c
 	}
 	description := author.Bio
 	if strings.TrimSpace(description) == "" {
-		description = "Posts by " + author.DisplayName
+		description = fmt.Sprintf(pub.Author.PostsFallback, author.DisplayName)
 	}
 	path := candidate.Path
+	authorLine := ""
+	if strings.TrimSpace(pub.Author.LinePrefix) != "" {
+		authorLine = pub.Author.LinePrefix + author.DisplayName
+	}
 	request, err := a.renderRequest(r, config, publicrender.PublicPage{
-		Kind:         publicrender.RenderKindAuthor,
-		Screen:       "author",
-		TemplateRole: "author",
-		Title:        author.DisplayName,
-		Description:  description,
-		Author:       author,
-		Pagination:   paginationData(path, page, result.TotalPages),
-		Breadcrumbs:  []publicrender.Breadcrumb{{Label: "Home", URL: "/"}, {Label: "Authors", URL: "/author/"}, {Label: author.DisplayName, URL: path}},
-		Items:        a.archiveItems(r, result.Items, config.Permalinks),
-		SEO:          seoModel(author.DisplayName, description, path, "profile", nil, time.Time{}, time.Time{}, false),
+		Kind:                  publicrender.RenderKindAuthor,
+		Screen:                "author",
+		TemplateRole:          "author",
+		Title:                 author.DisplayName,
+		Description:           description,
+		Author:                author,
+		AuthorAttributionLine: authorLine,
+		Pagination:            paginationData(path, page, result.TotalPages, pub.Pagination.Previous, pub.Pagination.Next),
+		Breadcrumbs: []publicrender.Breadcrumb{
+			{Label: pub.Breadcrumbs.Home, URL: "/"},
+			{Label: pub.Breadcrumbs.Authors, URL: "/author/"},
+			{Label: author.DisplayName, URL: path},
+		},
+		Items: a.archiveItems(r, result.Items, config.Permalinks, active, fb),
+		SEO:   seoModel(author.DisplayName, description, path, "profile", nil, time.Time{}, time.Time{}, false),
 	}, path)
 	return request, true, err
 }
 
 func (a pageAssembler) page(r *http.Request, config publicrender.SiteConfig, slug string) (publicrender.RenderRequest, bool, error) {
-	entry, err := a.services.Content.GetBySlug(r.Context(), authz.Principal{}, domaincontent.KindPage, slug, locale.From(r.Context()))
+	entry, err := a.services.Content.GetBySlug(r.Context(), authz.Principal{}, domaincontent.KindPage, slug, locales.FromContext(r.Context()))
 	if err != nil {
 		if isResolvableMiss(err) {
 			return publicrender.RenderRequest{}, false, nil
@@ -218,7 +264,7 @@ func (a pageAssembler) post(r *http.Request, config publicrender.SiteConfig, can
 	case permalinks.CandidatePostID:
 		entry, err = a.services.Content.Get(r.Context(), authz.Principal{}, domaincontent.ID(candidate.ID))
 	default:
-		entry, err = a.services.Content.GetBySlug(r.Context(), authz.Principal{}, domaincontent.KindPost, candidate.Slug, locale.From(r.Context()))
+		entry, err = a.services.Content.GetBySlug(r.Context(), authz.Principal{}, domaincontent.KindPost, candidate.Slug, locales.FromContext(r.Context()))
 	}
 	if err != nil {
 		if isResolvableMiss(err) {
@@ -233,9 +279,11 @@ func (a pageAssembler) post(r *http.Request, config publicrender.SiteConfig, can
 }
 
 func (a pageAssembler) content(r *http.Request, config publicrender.SiteConfig, entry domaincontent.Entry, kind publicrender.RenderKind, screen string, role string) publicrender.RenderRequest {
+	pub := a.pub(r)
+	active, fb := a.locFB(r)
 	path := permalinks.EntryPath(entry, config.Permalinks)
-	title := entry.Title.Value(locale.From(r.Context()), "en")
-	description := entry.Excerpt.Value(locale.From(r.Context()), "en")
+	title := entry.Title.Value(active, fb)
+	description := entry.Excerpt.Value(active, fb)
 	if strings.TrimSpace(description) == "" {
 		description = title
 	}
@@ -243,26 +291,31 @@ func (a pageAssembler) content(r *http.Request, config publicrender.SiteConfig, 
 	featured := a.mediaView(r, entry.FeaturedMediaID)
 	author := a.authorView(r, entry.AuthorID)
 	terms := a.entryTerms(r, entry)
-	related := a.relatedPosts(r, entry, config.Permalinks)
-	breadcrumbs := []publicrender.Breadcrumb{{Label: "Home", URL: "/"}}
+	related := a.relatedPosts(r, entry, config.Permalinks, active, fb)
+	breadcrumbs := []publicrender.Breadcrumb{{Label: pub.Breadcrumbs.Home, URL: "/"}}
 	if kind == publicrender.RenderKindPost {
-		breadcrumbs = append(breadcrumbs, publicrender.Breadcrumb{Label: "Blog", URL: "/blog/"})
+		breadcrumbs = append(breadcrumbs, publicrender.Breadcrumb{Label: pub.Breadcrumbs.Blog, URL: "/blog/"})
 	}
 	breadcrumbs = append(breadcrumbs, publicrender.Breadcrumb{Label: title, URL: path})
+	authorAttribution := ""
+	if author != nil && strings.TrimSpace(pub.Author.LinePrefix) != "" {
+		authorAttribution = pub.Author.LinePrefix + author.DisplayName
+	}
 	request, _ := a.renderRequest(r, config, publicrender.PublicPage{
-		Kind:         kind,
-		Screen:       screen,
-		TemplateRole: domaintaxonomyRole(role),
-		Title:        title,
-		Description:  description,
-		Content:      entry.Body.Value(locale.From(r.Context()), "en"),
-		CanonicalURL: path,
-		Published:    "Published: " + publishedAt.UTC().Format(time.RFC3339),
-		Breadcrumbs:  breadcrumbs,
-		Author:       author,
-		Featured:     featured,
-		Terms:        terms,
-		RelatedItems: related,
+		Kind:                  kind,
+		Screen:                screen,
+		TemplateRole:          domaintaxonomyRole(role),
+		Title:                 title,
+		Description:           description,
+		Content:               entry.Body.Value(active, fb),
+		CanonicalURL:          path,
+		Published:             pub.Routes.PublishedPrefix + publishedAt.UTC().Format(time.RFC3339),
+		Breadcrumbs:           breadcrumbs,
+		AuthorAttributionLine: authorAttribution,
+		Author:                author,
+		Featured:              featured,
+		Terms:                 terms,
+		RelatedItems:          related,
 		SEO: seoModel(
 			title,
 			description,
@@ -278,15 +331,20 @@ func (a pageAssembler) content(r *http.Request, config publicrender.SiteConfig, 
 }
 
 func (a pageAssembler) notFound(r *http.Request, config publicrender.SiteConfig, description string) publicrender.RenderRequest {
+	pub := a.pub(r)
+	desc := strings.TrimSpace(description)
+	if desc == "" {
+		desc = pub.Routes.NotFoundDescription
+	}
 	request, _ := a.renderRequest(r, config, publicrender.PublicPage{
 		Kind:         publicrender.RenderKindNotFound,
 		Screen:       "not-found",
 		TemplateRole: "not_found",
-		Title:        "Not Found",
-		Description:  description,
-		ActionLabel:  "Go home",
-		Breadcrumbs:  []publicrender.Breadcrumb{{Label: "Home", URL: "/"}},
-		SEO:          seoModel("Not Found", description, "", "website", nil, time.Time{}, time.Time{}, true),
+		Title:        pub.Routes.NotFoundTitle,
+		Description:  desc,
+		ActionLabel:  pub.Routes.NotFoundAction,
+		Breadcrumbs:  []publicrender.Breadcrumb{{Label: pub.Breadcrumbs.Home, URL: "/"}},
+		SEO:          seoModel(pub.Routes.NotFoundTitle, desc, "", "website", nil, time.Time{}, time.Time{}, true),
 	}, r.URL.Path)
 	return request
 }
@@ -299,7 +357,11 @@ func (a pageAssembler) renderRequest(r *http.Request, config publicrender.SiteCo
 	if strings.TrimSpace(path) == "" {
 		path = r.URL.Path
 	}
-	page.Layout = a.layout(r, config, page.Title, path, manifest.ID, preset)
+	layoutTitle := page.Title
+	if strings.TrimSpace(page.DocumentTitle) != "" {
+		layoutTitle = page.DocumentTitle
+	}
+	page.Layout = a.layout(r, config, layoutTitle, path, manifest.ID, preset)
 	if page.CanonicalURL == "" {
 		page.CanonicalURL = path
 	}
@@ -310,7 +372,7 @@ func (a pageAssembler) renderRequest(r *http.Request, config publicrender.SiteCo
 		Context: publicrender.RenderContext{
 			Path:        r.URL.Path,
 			Query:       r.URL.RawQuery,
-			Locale:      locale.From(r.Context()),
+			Locale:      locales.FromContext(r.Context()),
 			ThemeID:     manifest.ID,
 			StylePreset: preset.ID,
 		},
@@ -319,70 +381,90 @@ func (a pageAssembler) renderRequest(r *http.Request, config publicrender.SiteCo
 }
 
 func (a pageAssembler) layout(r *http.Request, config publicrender.SiteConfig, title string, activePath string, themeID domainthemes.ThemeID, preset domainthemes.StylePreset) publicrender.Layout {
-	fixture := adminfixtures.MustLoad(locale.From(r.Context()))
+	pub := a.pub(r)
+	adminFixture := adminfixtures.MustLoad(locales.FromContext(r.Context()))
 	stylesheets, scripts := a.themes.ThemeAssets(string(themeID))
 	stylesheets = append(stylesheets, preset.Stylesheets...)
 	scripts = append(scripts, preset.Scripts...)
 	return publicrender.Layout{
 		Title:         title,
-		Lang:          fixture.Meta.Lang,
+		Lang:          pub.Meta.Lang,
 		Brand:         firstNonEmpty(config.BrandName, config.Title, platformthemes.DefaultThemeLabel),
-		Tagline:       config.HomeIntro,
+		Tagline:       "",
 		ActivePath:    activePath,
 		ThemeID:       themeID,
 		StylePresetID: firstNonEmpty(preset.ID, "default"),
-		HeaderMenu:    a.menuItems(r, domainmenus.Location("primary"), activePath),
-		FooterMenu:    a.menuItems(r, domainmenus.Location("footer"), activePath),
+		HeaderMenu:    a.menuItems(r, domainmenus.Location("primary"), activePath, pub),
+		FooterMenu:    a.menuItems(r, domainmenus.Location("footer"), activePath, pub),
 		Assets: publicrender.AssetBundle{
 			Base:        assets.Resolve(),
 			Stylesheets: stylesheets,
 			Scripts:     scripts,
 		},
 		ThemeToggle: view.ThemeToggleData{
-			Label:              fixture.Theme.Label,
-			SwitchToDarkLabel:  fixture.Theme.SwitchToDarkLabel,
-			SwitchToLightLabel: fixture.Theme.SwitchToLightLabel,
+			Label:              adminFixture.Theme.Label,
+			SwitchToDarkLabel:  adminFixture.Theme.SwitchToDarkLabel,
+			SwitchToLightLabel: adminFixture.Theme.SwitchToLightLabel,
 		},
 		Language: view.BuildLanguageToggleFromContext(r.Context(),
-			view.WithLabel(fixture.Language.Label),
-			view.WithCurrentLabel(fixture.Language.CurrentLabel),
-			view.WithNextLocale(fixture.Language.NextLocale),
-			view.WithNextLabel(fixture.Language.NextLabel),
-			view.WithLocaleLabels(fixture.Language.LocaleLabels),
+			view.WithLabel(adminFixture.Language.Label),
+			view.WithCurrentLabel(adminFixture.Language.CurrentLabel),
+			view.WithNextLocale(adminFixture.Language.NextLocale),
+			view.WithNextLabel(adminFixture.Language.NextLabel),
+			view.WithLocaleLabels(adminFixture.Language.LocaleLabels),
 		),
+		Chrome: publicrender.PublicChrome{
+			EmptyArchive:         pub.Chrome.EmptyArchive,
+			OpenAction:           pub.Chrome.OpenAction,
+			ReadAction:           pub.Chrome.ReadAction,
+			RelatedTitle:         pub.Chrome.RelatedTitle,
+			RelatedInsightsTitle: pub.Chrome.RelatedInsightsTitle,
+			AuthorSectionTitle:   pub.Author.SectionTitle,
+			AuthorExpertTitle: func() string {
+				if v := strings.TrimSpace(pub.Author.ExpertTitle); v != "" {
+					return v
+				}
+				return pub.Author.SectionTitle
+			}(),
+			NoMenuItems:      pub.Chrome.NoMenuItems,
+			ThemePresetBadge: pub.ThemePresetBadge(string(themeID), firstNonEmpty(preset.ID, "default")),
+			ByAuthorPrefix:   pub.Chrome.ByAuthorPrefix,
+			AuthorLinePrefix: pub.Author.LinePrefix,
+			FooterThanks:     pub.Chrome.FooterThanks,
+		},
 	}
 }
 
-func (a pageAssembler) menuItems(r *http.Request, location domainmenus.Location, activePath string) []publicrender.MenuItem {
+func (a pageAssembler) menuItems(r *http.Request, location domainmenus.Location, activePath string, pub publicfixtures.PublicSite) []publicrender.MenuItem {
 	menu, ok, err := a.services.Menus.ByLocation(r.Context(), location)
 	if err != nil || !ok {
 		return nil
 	}
-	return mapMenuItems(menu.Items, activePath)
+	return a.mapMenuItems(r, menu.Items, activePath, pub)
 }
 
-func mapMenuItems(items []domainmenus.Item, activePath string) []publicrender.MenuItem {
+func (a pageAssembler) mapMenuItems(r *http.Request, items []domainmenus.Item, activePath string, pub publicfixtures.PublicSite) []publicrender.MenuItem {
 	out := make([]publicrender.MenuItem, 0, len(items))
 	for _, item := range items {
 		childActive := strings.TrimRight(item.URL, "/") == strings.TrimRight(activePath, "/")
 		out = append(out, publicrender.MenuItem{
-			Label:    item.Label,
+			Label:    pub.MenuLabel(string(item.ID), item.Label),
 			URL:      defaultPath(item.URL),
 			Active:   childActive,
-			Children: mapMenuItems(item.Children, activePath),
+			Children: a.mapMenuItems(r, item.Children, activePath, pub),
 		})
 	}
 	return out
 }
 
-func (a pageAssembler) archiveItems(r *http.Request, entries []domaincontent.Entry, settings permalinks.Settings) []publicrender.ArchiveItem {
+func (a pageAssembler) archiveItems(r *http.Request, entries []domaincontent.Entry, settings permalinks.Settings, active string, fb string) []publicrender.ArchiveItem {
 	items := make([]publicrender.ArchiveItem, 0, len(entries))
 	for _, entry := range entries {
 		items = append(items, publicrender.ArchiveItem{
 			ID:       string(entry.ID),
 			Kind:     string(entry.Kind),
-			Title:    entry.Title.Value(locale.From(r.Context()), "en"),
-			Summary:  entry.Excerpt.Value(locale.From(r.Context()), "en"),
+			Title:    entry.Title.Value(active, fb),
+			Summary:  entry.Excerpt.Value(active, fb),
 			Href:     permalinks.EntryPath(entry, settings),
 			Meta:     permalinks.PublishTime(entry).UTC().Format("2006-01-02"),
 			Author:   a.authorView(r, entry.AuthorID),
@@ -398,22 +480,37 @@ func (a pageAssembler) findTerm(r *http.Request, taxonomy domaintaxonomy.Type, v
 	if err != nil {
 		return domaintaxonomy.Term{}, false
 	}
+	active, fb := a.locFB(r)
 	for _, item := range terms {
-		if strings.EqualFold(item.Slug.Value(locale.From(r.Context()), "en"), value) ||
-			strings.EqualFold(item.Slug.Value("en", "en"), value) ||
-			string(item.ID) == value {
+		if termSlugMatches(item, value, active, fb) {
 			return item, true
 		}
 	}
 	return domaintaxonomy.Term{}, false
 }
 
-func (a pageAssembler) termView(item domaintaxonomy.Term) *publicrender.TermView {
+func termSlugMatches(term domaintaxonomy.Term, value string, active string, fb string) bool {
+	if strings.EqualFold(term.Slug.Value(active, fb), value) {
+		return true
+	}
+	if strings.EqualFold(term.Slug.Value(fb, active), value) {
+		return true
+	}
+	for _, loc := range locales.Supported() {
+		if strings.EqualFold(term.Slug.Value(loc, active), value) {
+			return true
+		}
+	}
+	return strings.EqualFold(string(term.ID), value)
+}
+
+func (a pageAssembler) termView(r *http.Request, item domaintaxonomy.Term) *publicrender.TermView {
+	active, fb := a.locFB(r)
 	return &publicrender.TermView{
 		Taxonomy: string(item.Type),
 		ID:       string(item.ID),
-		Slug:     item.Slug.Value("en", "en"),
-		Label:    item.Name.Value("en", "en"),
+		Slug:     item.Slug.Value(active, fb),
+		Label:    item.Name.Value(active, fb),
 	}
 }
 
@@ -433,7 +530,7 @@ func (a pageAssembler) entryTerms(r *http.Request, entry domaincontent.Entry) []
 		if !ok {
 			continue
 		}
-		if view := a.termView(term); view != nil {
+		if view := a.termView(r, term); view != nil {
 			views = append(views, *view)
 		}
 	}
@@ -459,7 +556,7 @@ func (a pageAssembler) findAuthorBySlug(r *http.Request, slug string) (*publicre
 				Slug:        profile.Slug,
 				DisplayName: profile.DisplayName,
 				Bio:         profile.Bio,
-				AvatarURL:   profile.AvatarURL,
+				AvatarURL:   a.authorAvatarURL(r, profile),
 				WebsiteURL:  profile.WebsiteURL,
 			}, true
 		}
@@ -480,9 +577,16 @@ func (a pageAssembler) authorView(r *http.Request, authorID string) *publicrende
 		Slug:        profile.Slug,
 		DisplayName: profile.DisplayName,
 		Bio:         profile.Bio,
-		AvatarURL:   profile.AvatarURL,
+		AvatarURL:   a.authorAvatarURL(r, profile),
 		WebsiteURL:  profile.WebsiteURL,
 	}
+}
+
+func (a pageAssembler) authorAvatarURL(r *http.Request, profile domainusers.AuthorProfile) string {
+	if mv := a.mediaView(r, profile.AvatarMediaID); mv != nil {
+		return mv.URL
+	}
+	return profile.AvatarURL
 }
 
 func (a pageAssembler) mediaView(r *http.Request, mediaID string) *publicrender.MediaView {
@@ -503,7 +607,7 @@ func (a pageAssembler) mediaView(r *http.Request, mediaID string) *publicrender.
 	}
 }
 
-func (a pageAssembler) relatedPosts(r *http.Request, entry domaincontent.Entry, settings permalinks.Settings) []publicrender.ArchiveItem {
+func (a pageAssembler) relatedPosts(r *http.Request, entry domaincontent.Entry, settings permalinks.Settings, active string, fb string) []publicrender.ArchiveItem {
 	var items []domaincontent.Entry
 	for _, ref := range entry.Terms {
 		result, err := a.services.Content.List(r.Context(), domaincontent.Query{
@@ -543,7 +647,7 @@ func (a pageAssembler) relatedPosts(r *http.Request, entry domaincontent.Entry, 
 			break
 		}
 	}
-	return a.archiveItems(r, filtered, settings)
+	return a.archiveItems(r, filtered, settings, active, fb)
 }
 
 func seoModel(title string, description string, canonical string, typ string, featured *publicrender.MediaView, publishedAt time.Time, modifiedAt time.Time, noindex bool) publicrender.SEOModel {
@@ -566,13 +670,13 @@ func seoModel(title string, description string, canonical string, typ string, fe
 	return model
 }
 
-func paginationData(base string, page int, totalPages int) publicrender.Pagination {
+func paginationData(base string, page int, totalPages int, previousLabel string, nextLabel string) publicrender.Pagination {
 	return publicrender.Pagination{
 		Page:          page,
 		TotalPages:    totalPages,
 		BaseHref:      base,
-		PreviousLabel: "Previous",
-		NextLabel:     "Next",
+		PreviousLabel: previousLabel,
+		NextLabel:     nextLabel,
 	}
 }
 

@@ -74,13 +74,30 @@ func Seed(ctx context.Context, store Store) error {
 	}
 
 	for _, term := range []domaintaxonomy.Term{
-		{ID: "term-news", Type: domaintaxonomy.TypeCategory, Name: domaincontent.LocalizedText{"en": "News"}, Slug: domaincontent.LocalizedText{"en": "news"}},
-		{ID: "term-featured", Type: domaintaxonomy.TypeTag, Name: domaincontent.LocalizedText{"en": "Featured"}, Slug: domaincontent.LocalizedText{"en": "featured"}},
-		{ID: "term-security", Type: domaintaxonomy.Type("topic"), Name: domaincontent.LocalizedText{"en": "Security"}, Slug: domaincontent.LocalizedText{"en": "security"}},
+		{ID: "term-news", Type: domaintaxonomy.TypeCategory, Name: domaincontent.LocalizedText{"en": "News", "ru": "Новости"}, Slug: domaincontent.LocalizedText{"en": "news", "ru": "news"}},
+		{ID: "term-featured", Type: domaintaxonomy.TypeTag, Name: domaincontent.LocalizedText{"en": "Featured", "ru": "Избранное"}, Slug: domaincontent.LocalizedText{"en": "featured", "ru": "featured"}},
+		{ID: "term-security", Type: domaintaxonomy.Type("topic"), Name: domaincontent.LocalizedText{"en": "Security", "ru": "Безопасность"}, Slug: domaincontent.LocalizedText{"en": "security", "ru": "security"}},
 	} {
 		if err := store.SaveTerm(ctx, term); err != nil {
 			return err
 		}
+	}
+
+	if err := store.SaveMedia(ctx, domainmedia.Asset{
+		ID: "media-cover", Filename: "go-cms-itgarage.webp", MimeType: "image/webp", SizeBytes: 48_000,
+		Width: 1200, Height: 800, AltText: "GoCMS IT garage cover",
+		PublicURL: "/static/img/go-cms-itgarage.webp", PublicMeta: map[string]any{"source": "fixture"},
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		return err
+	}
+	if err := store.SaveMedia(ctx, domainmedia.Asset{
+		ID: "media-avatar", Filename: "gosms-banner.png", MimeType: "image/png", SizeBytes: 120_000,
+		Width: 1200, Height: 630, AltText: "Mr Gopher",
+		PublicURL: "/static/img/gosms-banner.png", PublicMeta: map[string]any{"source": "fixture"},
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		return err
 	}
 
 	passwordUpdatedAt := now
@@ -96,13 +113,15 @@ func Seed(ctx context.Context, store Store) error {
 			PasswordUpdatedAt: &passwordUpdatedAt,
 		},
 		{
-			ID:                "author-1",
-			Login:             "jane",
-			DisplayName:       "Jane Editor",
-			Email:             "jane@example.test",
-			Status:            domainusers.StatusActive,
-			Roles:             []string{authz.RoleEditor},
-			Profile:           domainusers.AuthorProfile{Slug: "jane", Bio: "Fixture editor", AvatarURL: "/media/avatar-jane.png"},
+			ID:          "author-1",
+			Login:       "mrgopher",
+			DisplayName: "Mr Gopher",
+			Email:       "mr.gopher@gocms.example.test",
+			Status:      domainusers.StatusActive,
+			Roles:       []string{authz.RoleEditor},
+			Profile: domainusers.AuthorProfile{
+				Slug: "mr-gopher", Bio: "GoCMS mascot and fixture author.", AvatarMediaID: "media-avatar",
+			},
 			PasswordHash:      editorHash,
 			PasswordUpdatedAt: &passwordUpdatedAt,
 		},
@@ -134,33 +153,38 @@ func Seed(ctx context.Context, store Store) error {
 		return err
 	}
 
-	if err := store.SaveMedia(ctx, domainmedia.Asset{ID: "media-cover", Filename: "cover.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Width: 1200, Height: 800, AltText: "Cover image", PublicURL: "/media/cover.jpg", PublicMeta: map[string]any{"source": "fixture"}, CreatedAt: now, UpdatedAt: now}); err != nil {
-		return err
-	}
-
 	publishedAt := published
 	scheduledAt := future
 	entries := []domaincontent.Entry{
 		{
 			ID: "content-post-published", Kind: domaincontent.KindPost, Status: domaincontent.StatusPublished, Visibility: domaincontent.VisibilityPublic,
-			Title: domaincontent.LocalizedText{"en": "Published Post"}, Slug: domaincontent.LocalizedText{"en": "published-post"}, Body: domaincontent.LocalizedText{"en": "Public fixture content"}, Excerpt: domaincontent.LocalizedText{"en": "Public excerpt"},
+			Title:    domaincontent.LocalizedText{"en": "Published Post", "ru": "Опубликованная запись"},
+			Slug:     domaincontent.LocalizedText{"en": "published-post", "ru": "published-post"},
+			Body:     domaincontent.LocalizedText{"en": "Public fixture content", "ru": "Тестовое публичное содержимое"},
+			Excerpt:  domaincontent.LocalizedText{"en": "Public excerpt", "ru": "Краткое описание"},
 			AuthorID: "author-1", FeaturedMediaID: "media-cover", Terms: []domaincontent.TermRef{{Taxonomy: "category", TermID: "term-news"}, {Taxonomy: "tag", TermID: "term-featured"}},
 			Metadata:  domaincontent.Metadata{"public_key": {Value: "public", Public: true}, "private_key": {Value: "private", Public: false}},
 			CreatedAt: now.Add(-48 * time.Hour), UpdatedAt: now.Add(-24 * time.Hour), PublishedAt: &publishedAt,
 		},
 		{
 			ID: "content-post-draft", Kind: domaincontent.KindPost, Status: domaincontent.StatusDraft, Visibility: domaincontent.VisibilityPublic,
-			Title: domaincontent.LocalizedText{"en": "Draft Post"}, Slug: domaincontent.LocalizedText{"en": "draft-post"}, Body: domaincontent.LocalizedText{"en": "Draft fixture content"},
+			Title:    domaincontent.LocalizedText{"en": "Draft Post", "ru": "Черновик"},
+			Slug:     domaincontent.LocalizedText{"en": "draft-post", "ru": "draft-post"},
+			Body:     domaincontent.LocalizedText{"en": "Draft fixture content", "ru": "Черновое содержимое"},
 			AuthorID: "author-1", CreatedAt: now, UpdatedAt: now,
 		},
 		{
 			ID: "content-post-scheduled", Kind: domaincontent.KindPost, Status: domaincontent.StatusScheduled, Visibility: domaincontent.VisibilityPublic,
-			Title: domaincontent.LocalizedText{"en": "Scheduled Post"}, Slug: domaincontent.LocalizedText{"en": "scheduled-post"}, Body: domaincontent.LocalizedText{"en": "Scheduled fixture content"},
+			Title:    domaincontent.LocalizedText{"en": "Scheduled Post", "ru": "Отложенная публикация"},
+			Slug:     domaincontent.LocalizedText{"en": "scheduled-post", "ru": "scheduled-post"},
+			Body:     domaincontent.LocalizedText{"en": "Scheduled fixture content", "ru": "Отложенное содержимое"},
 			AuthorID: "author-1", CreatedAt: now, UpdatedAt: now, PublishedAt: &scheduledAt,
 		},
 		{
 			ID: "content-page-about", Kind: domaincontent.KindPage, Status: domaincontent.StatusPublished, Visibility: domaincontent.VisibilityPublic,
-			Title: domaincontent.LocalizedText{"en": "About"}, Slug: domaincontent.LocalizedText{"en": "about"}, Body: domaincontent.LocalizedText{"en": "About page fixture"},
+			Title:    domaincontent.LocalizedText{"en": "About", "ru": "О проекте"},
+			Slug:     domaincontent.LocalizedText{"en": "about", "ru": "about"},
+			Body:     domaincontent.LocalizedText{"en": "About page fixture", "ru": "Тестовая страница «О проекте»"},
 			AuthorID: "author-1", CreatedAt: now.Add(-72 * time.Hour), UpdatedAt: now.Add(-24 * time.Hour), PublishedAt: &publishedAt,
 		},
 	}
@@ -171,7 +195,7 @@ func Seed(ctx context.Context, store Store) error {
 	}
 
 	for _, value := range []domainsettings.Value{
-		{Key: "site.title", Value: "GoCMS Fixture", Public: true},
+		{Key: "site.title", Value: "GoCMS", Public: true},
 		{Key: "site.private_note", Value: "hidden", Public: false},
 	} {
 		if err := store.SaveSetting(ctx, value); err != nil {
@@ -209,7 +233,7 @@ func Seed(ctx context.Context, store Store) error {
 				Label: "Resources",
 				URL:   "/blog/",
 				Children: []domainmenus.Item{
-					{ID: "menu-footer-author", Label: "Author Jane", URL: "/author/jane/"},
+					{ID: "menu-footer-author", Label: "Mr Gopher", URL: "/author/mr-gopher/"},
 				},
 			},
 		},

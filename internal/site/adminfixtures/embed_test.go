@@ -1,6 +1,10 @@
 package adminfixtures
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/fastygo/cms/internal/platform/locales"
+)
 
 func TestLoadAdminFixtures(t *testing.T) {
 	for _, loc := range Locales {
@@ -25,13 +29,12 @@ func TestLoadAdminFixtures(t *testing.T) {
 	}
 }
 
-func TestMustLoadFallsBackToEnglish(t *testing.T) {
+func TestMustLoadFallsBackToDefaultLocale(t *testing.T) {
 	fixture := MustLoad("does-not-exist")
 	if fixture.Meta.Title == "" {
 		t.Fatalf("fallback fixture meta title is empty")
 	}
-	if fixture.Meta.Lang != "en" {
-		t.Fatalf("fallback fixture lang = %q, want en", fixture.Meta.Lang)
+	if fixture.Meta.Lang != locales.Default {
+		t.Fatalf("fallback fixture lang = %q, want %q", fixture.Meta.Lang, locales.Default)
 	}
 }
-

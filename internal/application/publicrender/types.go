@@ -24,6 +24,7 @@ const (
 type SiteConfig struct {
 	Title           string
 	BrandName       string
+	HomeHeroTitle   string
 	HomeIntro       string
 	ActiveTheme     string
 	StylePreset     string
@@ -45,27 +46,30 @@ type RenderRequest struct {
 }
 
 type PublicPage struct {
-	Kind         RenderKind
-	Screen       string
-	TemplateRole themes.TemplateRole
-	Layout       Layout
-	Title        string
-	Description  string
-	Intro        string
-	Query        string
-	ActionLabel  string
-	Content      string
-	CanonicalURL string
-	Published    string
-	Breadcrumbs  []Breadcrumb
-	Pagination   Pagination
-	SEO          SEOModel
-	Items        []ArchiveItem
-	RelatedItems []ArchiveItem
-	Featured     *MediaView
-	Author       *AuthorView
-	CurrentTerm  *TermView
-	Terms        []TermView
+	Kind                  RenderKind
+	Screen                string
+	TemplateRole          themes.TemplateRole
+	Layout                Layout
+	DocumentTitle         string
+	Title                 string
+	Description           string
+	Intro                 string
+	Query                 string
+	QueryBadge            string
+	ActionLabel           string
+	Content               string
+	CanonicalURL          string
+	Published             string
+	AuthorAttributionLine string
+	Breadcrumbs           []Breadcrumb
+	Pagination            Pagination
+	SEO                   SEOModel
+	Items                 []ArchiveItem
+	RelatedItems          []ArchiveItem
+	Featured              *MediaView
+	Author                *AuthorView
+	CurrentTerm           *TermView
+	Terms                 []TermView
 }
 
 type Layout struct {
@@ -81,6 +85,23 @@ type Layout struct {
 	Assets        AssetBundle
 	ThemeToggle   view.ThemeToggleData
 	Language      view.LanguageToggleData
+	Chrome        PublicChrome
+}
+
+// PublicChrome carries localized strings for the default public theme shell.
+type PublicChrome struct {
+	EmptyArchive         string
+	OpenAction           string
+	ReadAction           string
+	RelatedTitle         string
+	RelatedInsightsTitle string
+	AuthorSectionTitle   string
+	AuthorExpertTitle    string
+	NoMenuItems          string
+	ThemePresetBadge     string
+	ByAuthorPrefix       string
+	AuthorLinePrefix     string
+	FooterThanks         string
 }
 
 type AssetBundle struct {

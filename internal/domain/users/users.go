@@ -26,12 +26,13 @@ type User struct {
 }
 
 type AuthorProfile struct {
-	ID          ID
-	Slug        string
-	DisplayName string
-	Bio         string
-	AvatarURL   string
-	WebsiteURL  string
+	ID            ID
+	Slug          string
+	DisplayName   string
+	Bio           string
+	AvatarURL     string
+	AvatarMediaID string
+	WebsiteURL    string
 }
 
 func (u User) PublicAuthor() AuthorProfile {

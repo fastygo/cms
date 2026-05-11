@@ -17,17 +17,21 @@ templ ThemePage(data publicrender.PublicPage) {
 		Lang:           data.Layout.Lang,
 		BrandName:      data.Layout.Brand,
 		Active:         data.Layout.ActivePath,
+		NavItems:       publicMenuNavItems(data.Layout.HeaderMenu),
 		CSSPath:        data.Layout.Assets.Base.CSS,
 		ThemeJSPath:    data.Layout.Assets.Base.ThemeJS,
 		AppJSPath:      data.Layout.Assets.Base.AppJS,
 		HeadExtra:      themeHead(data),
-		HeaderExtra:    toggles.LanguageToggle(data.Layout.Language),
+		HeaderExtra:    publicShellHeaderExtra(data.Layout),
 		ThemeToggle: ui8layout.ThemeToggleProps{
 			Label:              data.Layout.ThemeToggle.Label,
 			SwitchToDarkLabel:  data.Layout.ThemeToggle.SwitchToDarkLabel,
 			SwitchToLightLabel: data.Layout.ThemeToggle.SwitchToLightLabel,
 		},
-		MarketingShell: true,
+		MarketingShell:       true,
+		HeaderLogoURL:        "/static/img/gocms-logo.png",
+		HeaderLogoHomeHref:   "/",
+		HeaderLogoAlt:        publicHeaderLogoAlt(data.Layout.Brand),
 	}) {
 		@siteHeader(data.Layout)
 		@pageBody(data)
@@ -80,32 +84,88 @@ templ siteHeader(layout publicrender.Layout) {
 			"data-gocms-style-preset":  layout.StylePresetID,
 		},
 	}) {
-		@ui.Container(ui.ContainerProps{Class: "py-6"}) {
-			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
-				@ui.Group(ui.GroupProps{Class: "justify-between items-start gap-4"}) {
-					@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-						@ui.Title(ui.TitleProps{Order: 2}, layout.Brand)
-						if layout.Tagline != "" {
-							@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Tagline)
-						}
+	}
+}
+
+templ publicShellHeaderExtra(layout publicrender.Layout) {
+	@ui.Box(ui.BoxProps{Class: "flex items-center gap-4"}) {
+		@elements.MarkerSection(elements.MarkerProps{
+			Class: "gocms-public-menu",
+			Attrs: templpkg.Attributes{"data-gocms-menu-location": "header"},
+		}) {
+			@elements.MarkerNav(elements.MarkerProps{
+				Class: "ui-header-nav-wrap",
+				Attrs: templpkg.Attributes{"aria-label": "Primary"},
+			}) {
+				@ui.Group(ui.GroupProps{Class: "ui-header-nav"}) {
+					for _, item := range flattenPublicMenu(layout.HeaderMenu) {
+						@ui.Button(ui.ButtonProps{
+							Href:    item.URL,
+							Variant: "link",
+							Class:   publicHeaderNavLinkClass(item.Active),
+						}, item.Label)
 					}
-					@ui.Badge(ui.BadgeProps{Variant: "outline"}, "Theme: "+string(layout.ThemeID)+" | Preset: "+layout.StylePresetID)
 				}
-				@menuTree(layout.HeaderMenu, "header")
 			}
 		}
+		@toggles.LanguageToggle(layout.Language)
 	}
 }
 
 templ siteFooter(layout publicrender.Layout) {
+	@elements.MarkerDiv(elements.MarkerProps{
+		Class: "gocms-public-gradient-rule",
+		Attrs: templpkg.Attributes{"aria-hidden": "true"},
+	}) {
+	}
 	@elements.MarkerSection(elements.MarkerProps{
 		Class: "gocms-public-footer",
 		Attrs: templpkg.Attributes{"data-gocms-public-footer": string(layout.ThemeID)},
 	}) {
-		@ui.Container(ui.ContainerProps{Class: "py-8"}) {
-			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
-				@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, layout.Brand)
-				@menuTree(layout.FooterMenu, "footer")
+		@ui.Container(ui.ContainerProps{Class: "px-4 sm:px-6"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-10 pb-10 pt-10"}) {
+				@ui.Grid(ui.GridProps{
+					Cols:  "1-2",
+					Class: "gap-8 md:items-start md:gap-12",
+				}) {
+					@ui.Text(ui.TextProps{
+						Tag:        "span",
+						FontSize:   "xl",
+						FontWeight: "semibold",
+						Class:      "block tracking-tight text-foreground md:pt-0.5",
+					}, layout.Brand)
+					@elements.MarkerSection(elements.MarkerProps{
+						Class: "gocms-public-menu",
+						Attrs: templpkg.Attributes{"data-gocms-menu-location": "footer"},
+					}) {
+						@elements.MarkerNav(elements.MarkerProps{
+							Class: "gocms-public-footer-links",
+							Attrs: templpkg.Attributes{"aria-label": "Footer"},
+						}) {
+							if len(layout.FooterMenu) == 0 {
+								@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, layout.Chrome.NoMenuItems)
+							}
+							for _, item := range flattenPublicMenu(layout.FooterMenu) {
+								@ui.Button(ui.ButtonProps{
+									Href:    item.URL,
+									Variant: "link",
+									Class:   footerNavLinkClass(item.Active),
+								}, item.Label)
+							}
+						}
+					}
+				}
+				@elements.MarkerDiv(elements.MarkerProps{
+					Class: "gocms-public-gradient-rule gocms-public-gradient-rule--half mx-auto",
+					Attrs: templpkg.Attributes{"aria-hidden": "true"},
+				}) {
+				}
+				@ui.Text(ui.TextProps{
+					FontSize:   "sm",
+					TextColor:  "muted-foreground",
+					TextAlign:  "center",
+					LineHeight: "relaxed",
+				}, layout.Chrome.FooterThanks)
 			}
 		}
 	}
@@ -119,19 +179,25 @@ templ pageBody(data publicrender.PublicPage) {
 			"data-gocms-theme":         string(data.Layout.ThemeID),
 		},
 	}) {
-		@ui.Container(ui.ContainerProps{Class: "py-10"}) {
-			@ui.Stack(ui.StackProps{Class: "gap-8"}) {
+		@ui.Container(ui.ContainerProps{Class: "px-4 pb-10 pt-6 sm:px-6"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-6"}) {
 				@breadcrumbs(data.Breadcrumbs)
 				@pageHero(data)
 				switch data.Kind {
-				case publicrender.RenderKindHome, publicrender.RenderKindBlog, publicrender.RenderKindArchive, publicrender.RenderKindTaxonomy, publicrender.RenderKindAuthor, publicrender.RenderKindSearch:
-					@archiveItems(data.Items)
+				case publicrender.RenderKindHome:
+					@homeLatestPosts(data)
+					@pagination(data.Pagination)
+				case publicrender.RenderKindAuthor:
+					@authorArchivePosts(data)
+					@pagination(data.Pagination)
+				case publicrender.RenderKindBlog, publicrender.RenderKindArchive, publicrender.RenderKindTaxonomy, publicrender.RenderKindSearch:
+					@archiveItems(data)
 					@pagination(data.Pagination)
 				case publicrender.RenderKindPost, publicrender.RenderKindPage:
 					@featuredMedia(data.Featured)
 					@ifText(data.Content)
 					@contentMeta(data)
-					@relatedItems(data.RelatedItems)
+					@relatedItems(data)
 				default:
 					if data.ActionLabel != "" {
 						@ui.Button(ui.ButtonProps{Href: "/", Variant: "outline"}, data.ActionLabel)
@@ -143,23 +209,38 @@ templ pageBody(data publicrender.PublicPage) {
 }
 
 templ pageHero(data publicrender.PublicPage) {
-	@ui.Block(ui.BlockProps{Tag: "section"}) {
-		@ui.Stack(ui.StackProps{Class: "gap-3"}) {
-			@ui.Title(ui.TitleProps{Order: 1}, data.Title)
-			if data.Description != "" {
-				@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
-			}
-			if data.Query != "" {
-				@ui.Badge(ui.BadgeProps{Variant: "outline"}, `Query: "`+data.Query+`"`)
-			}
-			if data.Author != nil {
-				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "Author: "+data.Author.DisplayName)
-			}
-			if len(data.Terms) > 0 {
-				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(data.Terms))
-			}
-			if data.Published != "" {
-				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Published)
+	@ui.Block(ui.BlockProps{
+		Tag:   "section",
+		Class: "gocms-public-hero gocms-public-hero-card my-6 w-full rounded-2xl shadow-sm",
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "px-6 py-8 text-center sm:px-10 sm:py-10"}) {
+			@ui.Stack(ui.StackProps{Class: "mx-auto max-w-3xl items-center gap-3"}) {
+				if data.Kind == publicrender.RenderKindAuthor && data.Author != nil && data.Author.AvatarURL != "" {
+					@ui.Image(ui.ImageProps{
+						Src:   data.Author.AvatarURL,
+						Alt:   data.Author.DisplayName,
+						Class: "mx-auto max-h-48 w-auto rounded-2xl border border-border object-cover shadow-sm",
+					})
+				}
+				@ui.Title(ui.TitleProps{Order: 1}, data.Title)
+				if data.Description != "" {
+					@ui.Text(ui.TextProps{FontSize: "lg", TextColor: "muted-foreground"}, data.Description)
+				}
+				if data.QueryBadge != "" {
+					@ui.Badge(ui.BadgeProps{Variant: "outline"}, data.QueryBadge)
+				}
+				if data.AuthorAttributionLine != "" {
+					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.AuthorAttributionLine)
+				}
+				if len(data.Terms) > 0 {
+					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(data.Terms))
+				}
+				if data.Published != "" {
+					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, data.Published)
+				}
+				if data.Layout.Chrome.ThemePresetBadge != "" {
+					@ui.Badge(ui.BadgeProps{Variant: "outline"}, data.Layout.Chrome.ThemePresetBadge)
+				}
 			}
 		}
 	}
@@ -170,13 +251,17 @@ templ contentMeta(data publicrender.PublicPage) {
 		if data.Author != nil && (data.Author.Bio != "" || data.Author.AvatarURL != "") {
 			@ui.Block(ui.BlockProps{Tag: "section"}) {
 				@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-					@ui.Title(ui.TitleProps{Order: 3}, "Author")
+					@ui.Title(ui.TitleProps{Order: 3}, data.Layout.Chrome.AuthorSectionTitle)
 					@ui.Text(ui.TextProps{}, data.Author.DisplayName)
 					if data.Author.Bio != "" {
 						@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Author.Bio)
 					}
 					if data.Author.AvatarURL != "" {
-						<img src={ templpkg.SafeURL(data.Author.AvatarURL) } alt={ data.Author.DisplayName } class="max-h-20 w-auto rounded-md"/>
+						@ui.Image(ui.ImageProps{
+							Src:   data.Author.AvatarURL,
+							Alt:   data.Author.DisplayName,
+							Class: "max-h-20 w-auto rounded-md",
+						})
 					}
 				}
 			}
@@ -189,61 +274,152 @@ templ contentMeta(data publicrender.PublicPage) {
 
 templ featuredMedia(item *publicrender.MediaView) {
 	if item != nil && item.URL != "" {
-		@ui.Block(ui.BlockProps{Tag: "figure"}) {
+		@ui.Figure(ui.FigureProps{Class: "m-0"}) {
 			@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-				<img src={ templpkg.SafeURL(item.URL) } alt={ item.AltText } class="w-full rounded-lg border border-border"/>
+				@ui.Image(ui.ImageProps{
+					Src:   item.URL,
+					Alt:   item.AltText,
+					Class: "w-full rounded-lg border border-border",
+					Fit:   "cover",
+				})
 				if item.Caption != "" {
-					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Caption)
+					@ui.Text(ui.TextProps{
+						Tag:         "figcaption",
+						FontSize:    "sm",
+						TextColor:   "muted-foreground",
+					}, item.Caption)
 				}
 			}
 		}
 	}
 }
 
-templ archiveItems(items []publicrender.ArchiveItem) {
+templ archiveItems(data publicrender.PublicPage) {
+	@ui.Block(ui.BlockProps{Tag: "section", Class: "gocms-public-archive-flow"}) {
+		@archiveItemList(data.Items, data.Layout.Chrome)
+	}
+}
+
+templ homeLatestPosts(data publicrender.PublicPage) {
+	@ui.Block(ui.BlockProps{
+		Tag:   "section",
+		Class: "gocms-public-home-latest",
+	}) {
+		if len(data.Items) == 0 {
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Layout.Chrome.EmptyArchive)
+		} else {
+			@archiveItemGrid(archiveSlice(data.Items, 0, 3), data.Layout.Chrome)
+			if len(data.Items) > 3 {
+				@ui.Box(ui.BoxProps{Class: "mt-6"}) {
+					@archiveItemList(archiveSlice(data.Items, 3, len(data.Items)), data.Layout.Chrome)
+				}
+			}
+		}
+	}
+}
+
+templ archiveItemGrid(items []publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
+	@ui.Grid(ui.GridProps{Cols: "1-3", Class: "gap-4"}) {
+		for _, item := range items {
+			@archiveCard(item, chrome)
+		}
+	}
+}
+
+templ archiveItemList(items []publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
 	@ui.Stack(ui.StackProps{Class: "gap-4"}) {
 		if len(items) == 0 {
-			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, "No public content is available yet.")
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, chrome.EmptyArchive)
 		}
 		for _, item := range items {
-			@elements.MarkerSection(elements.MarkerProps{
-				Class: "gocms-public-card",
-				Attrs: templpkg.Attributes{"data-gocms-public-item": item.Href},
-			}) {
-				@ui.Container(ui.ContainerProps{}) {
-					@ui.Stack(ui.StackProps{Class: "gap-3"}) {
-						@ui.Group(ui.GroupProps{Class: "justify-between items-start gap-4"}) {
-							@ui.Stack(ui.StackProps{Class: "gap-2"}) {
-								@ui.Title(ui.TitleProps{Order: 3}, item.Title)
-								if item.Summary != "" {
-									@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, item.Summary)
-								}
-								if item.Meta != "" {
-									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Meta)
-								}
-								if item.Author != nil {
-									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "By "+item.Author.DisplayName)
-								}
-								if len(item.Terms) > 0 {
-									@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(item.Terms))
-								}
-							}
-							@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "outline"}, "Open")
-						}
-						@featuredMedia(item.Featured)
-					}
+			@archiveCard(item, chrome)
+		}
+	}
+}
+
+templ archiveCard(item publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
+	@elements.MarkerSection(elements.MarkerProps{
+		Class: "gocms-public-card",
+		Attrs: templpkg.Attributes{"data-gocms-public-item": item.Href},
+	}) {
+		@ui.Container(ui.ContainerProps{Class: "gocms-public-archive-card rounded-2xl border border-border bg-card p-4 shadow-sm"}) {
+			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
+				@archiveCardMedia(item.Featured, item.Href)
+				@archiveCardMeta(item, chrome)
+				@ui.Title(ui.TitleProps{Order: 3}, item.Title)
+				if item.Summary != "" {
+					@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, item.Summary)
+				}
+				@ui.Box(ui.BoxProps{Class: "gocms-public-archive-cta w-full pt-1 [&_a]:flex [&_a]:w-full [&_a]:justify-center"}) {
+					@ui.Button(ui.ButtonProps{Href: item.Href, Variant: "default"}, chrome.OpenAction)
 				}
 			}
 		}
 	}
 }
 
-templ relatedItems(items []publicrender.ArchiveItem) {
-	if len(items) > 0 {
-		@ui.Block(ui.BlockProps{Tag: "section"}) {
+templ archiveCardMedia(media *publicrender.MediaView, postHref string) {
+	if media != nil && media.URL != "" {
+		@ui.Figure(ui.FigureProps{Class: "m-0 overflow-hidden rounded-xl border border-border bg-muted/20"}) {
+			@ui.ButtonBlock(ui.ButtonProps{
+				Href:    postHref,
+				Variant: "unstyled",
+				Size:    "",
+				Class:   "block w-full min-h-0 p-0 text-left shadow-none ring-offset-background hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+			}) {
+				@ui.Image(ui.ImageProps{
+					Src:      media.URL,
+					Alt:      media.AltText,
+					Class:    "aspect-[16/10] w-full rounded-xl",
+					Fit:      "cover",
+					Position: "center",
+					Loading:  "lazy",
+				})
+			}
+			if media.Caption != "" {
+				@ui.Text(ui.TextProps{
+					Tag:       "figcaption",
+					FontSize:  "sm",
+					TextColor: "muted-foreground",
+					Class:     "px-3 pb-3 pt-2",
+				}, media.Caption)
+			}
+		}
+	}
+}
+
+templ archiveCardMeta(item publicrender.ArchiveItem, chrome publicrender.PublicChrome) {
+	if item.Meta != "" || item.Author != nil || len(item.Terms) > 0 {
+		@ui.Stack(ui.StackProps{Class: "gap-1.5"}) {
+			if item.Meta != "" {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Meta)
+			}
+			if item.Author != nil {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, chrome.ByAuthorPrefix+item.Author.DisplayName)
+			}
+			if len(item.Terms) > 0 {
+				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, termLabels(item.Terms))
+			}
+		}
+	}
+}
+
+templ authorArchivePosts(data publicrender.PublicPage) {
+	@ui.Block(ui.BlockProps{Tag: "section", Class: "gocms-public-author-archive"}) {
+		if len(data.Items) == 0 {
+			@ui.Text(ui.TextProps{TextColor: "muted-foreground"}, data.Layout.Chrome.EmptyArchive)
+		} else {
+			@archiveItemGrid(data.Items, data.Layout.Chrome)
+		}
+	}
+}
+
+templ relatedItems(data publicrender.PublicPage) {
+	if len(data.RelatedItems) > 0 {
+		@ui.Block(ui.BlockProps{Tag: "section", Class: "gocms-public-related"}) {
 			@ui.Stack(ui.StackProps{Class: "gap-4"}) {
-				@ui.Title(ui.TitleProps{Order: 3}, "Related")
-				@archiveItems(items)
+				@ui.Title(ui.TitleProps{Order: 3}, data.Layout.Chrome.RelatedTitle)
+				@archiveItemGrid(data.RelatedItems, data.Layout.Chrome)
 			}
 		}
 	}
@@ -271,31 +447,6 @@ templ breadcrumbs(items []publicrender.Breadcrumb) {
 	}
 }
 
-templ menuTree(items []publicrender.MenuItem, location string) {
-	@elements.MarkerSection(elements.MarkerProps{
-		Class: "gocms-public-menu",
-		Attrs: templpkg.Attributes{"data-gocms-menu-location": location},
-	}) {
-		@ui.Stack(ui.StackProps{Class: "gap-3"}) {
-			if len(items) == 0 {
-				@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "No menu items configured.")
-			}
-			for _, item := range items {
-				@menuItem(item, 0)
-			}
-		}
-	}
-}
-
-templ menuItem(item publicrender.MenuItem, depth int) {
-	@ui.Stack(ui.StackProps{Class: menuIndent(depth)}) {
-		@ui.Button(ui.ButtonProps{Href: item.URL, Variant: menuVariant(item.Active)}, item.Label)
-		for _, child := range item.Children {
-			@menuItem(child, depth+1)
-		}
-	}
-}
-
 templ pagination(data publicrender.Pagination) {
 	if data.TotalPages > 1 {
 		@elements.PaginationControl(elements.PaginationData{
@@ -316,6 +467,26 @@ templ ifText(content string) {
 	}
 }
 
+func publicHeaderLogoAlt(brand string) string {
+	if strings.TrimSpace(brand) != "" {
+		return brand
+	}
+	return "GoCMS"
+}
+
+func archiveSlice(items []publicrender.ArchiveItem, start, end int) []publicrender.ArchiveItem {
+	if start < 0 {
+		start = 0
+	}
+	if end > len(items) {
+		end = len(items)
+	}
+	if start >= len(items) || end <= start {
+		return nil
+	}
+	return items[start:end]
+}
+
 func ogType(value string) string {
 	if strings.TrimSpace(value) == "" {
 		return "website"
@@ -333,21 +504,4 @@ func termLabels(items []publicrender.TermView) string {
 		labels = append(labels, label)
 	}
 	return strings.Join(labels, " | ")
-}
-
-func menuIndent(depth int) string {
-	if depth <= 0 {
-		return "gap-2"
-	}
-	if depth == 1 {
-		return "gap-2 pl-4"
-	}
-	return "gap-2 pl-8"
-}
-
-func menuVariant(active bool) string {
-	if active {
-		return "default"
-	}
-	return "link"
 }

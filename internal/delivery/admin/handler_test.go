@@ -70,6 +70,83 @@ func TestAdminAuthFlow(t *testing.T) {
 	}
 }
 
+func TestLegacyAdminPathRedirectsToGoAdmin(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	for _, tc := range []struct {
+		from string
+		to   string
+	}{
+		{"/admin", "/go-admin"},
+		{"/admin/settings", "/go-admin/settings"},
+		{"/admin/posts?q=1", "/go-admin/posts?q=1"},
+	} {
+		t.Run(tc.from, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.from, nil)
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusPermanentRedirect {
+				t.Fatalf("GET %s: status=%d want %d body=%s", tc.from, rec.Code, http.StatusPermanentRedirect, rec.Body.String())
+			}
+			if got := rec.Header().Get("Location"); got != tc.to {
+				t.Fatalf("Location=%q want %q", got, tc.to)
+			}
+		})
+	}
+}
+
+func TestLoginPageNormalizesLegacyAdminReturnTo(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/go-login?return_to="+url.QueryEscape("/admin/settings"), nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login page status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `name="return_to"`) || !strings.Contains(rec.Body.String(), "/go-admin/settings") {
+		t.Fatalf("expected normalized return_to in form, body snippet: %s", rec.Body.String()[:min(800, len(rec.Body.String()))])
+	}
+}
+
+func TestAdminTrailingSlashRedirectsToCanonicalPath(t *testing.T) {
+	mux, closeFn := newAdminMux(t)
+	defer closeFn()
+
+	for _, tc := range []struct {
+		from string
+		to   string
+	}{
+		{"/go-admin/", "/go-admin"},
+		{"/go-admin/settings/", "/go-admin/settings"},
+		{"/go-admin/posts/", "/go-admin/posts"},
+	} {
+		t.Run(tc.from, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.from, nil)
+			req.Header.Set("Authorization", "Bearer admin-token")
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusPermanentRedirect {
+				t.Fatalf("GET %s: want status %d, got %d body=%s", tc.from, http.StatusPermanentRedirect, rec.Code, rec.Body.String())
+			}
+			if got := rec.Header().Get("Location"); got != tc.to {
+				t.Fatalf("Location = %q, want %q", got, tc.to)
+			}
+		})
+	}
+
+	q := httptest.NewRecorder()
+	qreq := httptest.NewRequest(http.MethodGet, "/go-admin/runtime/?debug=1", nil)
+	qreq.Header.Set("Authorization", "Bearer admin-token")
+	mux.ServeHTTP(q, qreq)
+	if q.Code != http.StatusPermanentRedirect {
+		t.Fatalf("query: want %d, got %d", http.StatusPermanentRedirect, q.Code)
+	}
+	if got := q.Header().Get("Location"); got != "/go-admin/runtime?debug=1" {
+		t.Fatalf("Location = %q", got)
+	}
+}
+
 func TestAdminUsesVersionedAssetsWhenManifestExists(t *testing.T) {
 	mux, closeFn := newAdminMux(t)
 	defer closeFn()
@@ -374,7 +451,7 @@ func TestAdminContentListControlsAndScreenPreferences(t *testing.T) {
 	defer closeFn()
 
 	list := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/go-admin/posts?search=Published&filter_status=published&columns=title,status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/go-admin/posts?search=published&filter_status=published&columns=title,status", nil)
 	req.Header.Set("Authorization", "Bearer admin-token")
 	mux.ServeHTTP(list, req)
 	if list.Code != http.StatusOK {
@@ -393,10 +470,10 @@ func TestAdminContentListControlsAndScreenPreferences(t *testing.T) {
 			t.Fatalf("expected posts list to contain %q", expected)
 		}
 	}
-	if !strings.Contains(body, "Published Post") {
-		t.Fatalf("expected filtered list to include published post")
+	if !strings.Contains(body, "Опубликованная запись") {
+		t.Fatalf("expected filtered list to include published post (default admin locale)")
 	}
-	if strings.Contains(body, "Draft Post") {
+	if strings.Contains(body, `edit=content-post-draft`) {
 		t.Fatalf("draft post should be filtered out by published status")
 	}
 
@@ -439,6 +516,7 @@ func TestAdminUsersQuickEditAndBulkStatus(t *testing.T) {
 	body := page.Body.String()
 	for _, expected := range []string{
 		`name="display_name"`,
+		`name="avatar_media_id"`,
 		`name="status"`,
 		`status:suspended`,
 		`edit=author-1`,
@@ -453,9 +531,9 @@ func TestAdminUsersQuickEditAndBulkStatus(t *testing.T) {
 	quickForm := url.Values{
 		"action_token": {token},
 		"id":           {"author-1"},
-		"login":        {"jane"},
-		"display_name": {"Jane Editor"},
-		"email":        {"jane@example.test"},
+		"login":        {"mrgopher"},
+		"display_name": {"Mr Gopher"},
+		"email":        {"mr.gopher@gocms.example.test"},
 		"status":       {"suspended"},
 		"return_to":    {"/go-admin/users"},
 	}
@@ -471,7 +549,7 @@ func TestAdminUsersQuickEditAndBulkStatus(t *testing.T) {
 	suspendedReq := httptest.NewRequest(http.MethodGet, "/go-admin/users?filter_status=suspended", nil)
 	suspendedReq.Header.Set("Authorization", "Bearer admin-token")
 	mux.ServeHTTP(suspended, suspendedReq)
-	if !strings.Contains(suspended.Body.String(), "Jane Editor") || !strings.Contains(suspended.Body.String(), "suspended") {
+	if !strings.Contains(suspended.Body.String(), "Mr Gopher") || !strings.Contains(suspended.Body.String(), "suspended") {
 		t.Fatalf("expected quick edited user to be suspended: %s", suspended.Body.String())
 	}
 
@@ -494,7 +572,7 @@ func TestAdminUsersQuickEditAndBulkStatus(t *testing.T) {
 	activeReq := httptest.NewRequest(http.MethodGet, "/go-admin/users?filter_status=active", nil)
 	activeReq.Header.Set("Authorization", "Bearer admin-token")
 	mux.ServeHTTP(active, activeReq)
-	if !strings.Contains(active.Body.String(), "Jane Editor") || !strings.Contains(active.Body.String(), "active") {
+	if !strings.Contains(active.Body.String(), "Mr Gopher") || !strings.Contains(active.Body.String(), "active") {
 		t.Fatalf("expected bulk restored user to active: %s", active.Body.String())
 	}
 }
