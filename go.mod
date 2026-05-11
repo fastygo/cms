@@ -36,6 +36,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/fastygo/ui8kit => ../@UI8Kit
-
 tool github.com/a-h/templ/cmd/templ

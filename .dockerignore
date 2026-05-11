@@ -1,0 +1,16 @@
+.git
+.gitignore
+.manual
+.project
+.ui8px/reports
+.ui8px/telemetry
+bin
+node_modules
+
+web/static/asset-manifest.json
+web/static/css/app.*.css
+web/static/js/admin-editor.*.js
+web/static/js/playground.*.js
+web/static/js/snapshots.*.js
+web/static/js/theme.*.js
+web/static/js/ui8kit.*.js

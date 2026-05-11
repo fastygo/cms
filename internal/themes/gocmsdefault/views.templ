@@ -28,10 +28,7 @@ templ ThemePage(data publicrender.PublicPage) {
 			SwitchToDarkLabel:  data.Layout.ThemeToggle.SwitchToDarkLabel,
 			SwitchToLightLabel: data.Layout.ThemeToggle.SwitchToLightLabel,
 		},
-		MarketingShell:       true,
-		HeaderLogoURL:        "/static/img/gocms-logo.png",
-		HeaderLogoHomeHref:   "/",
-		HeaderLogoAlt:        publicHeaderLogoAlt(data.Layout.Brand),
+		MarketingShell: true,
 	}) {
 		@siteHeader(data.Layout)
 		@pageBody(data)
@@ -465,13 +462,6 @@ templ ifText(content string) {
 			@templpkg.Raw(content)
 		}
 	}
-}
-
-func publicHeaderLogoAlt(brand string) string {
-	if strings.TrimSpace(brand) != "" {
-		return brand
-	}
-	return "GoCMS"
 }
 
 func archiveSlice(items []publicrender.ArchiveItem, start, end int) []publicrender.ArchiveItem {

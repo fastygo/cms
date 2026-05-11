@@ -16,6 +16,8 @@ github.com/fastygo/framework v0.0.0-20260428133456-8a8901eca249 h1:Es2XZ/CPdb8il
 github.com/fastygo/framework v0.0.0-20260428133456-8a8901eca249/go.mod h1:PQrh7If8XpCVPMp1tP8u3bUGvAlEsW3WlNpRkQzVTt0=
 github.com/fastygo/panel v0.0.0-20260507153054-7d218c36141b h1:lciG0qEQuvzt6uNAvvs9eRGekLin47c8LZTnZc0zMmY=
 github.com/fastygo/panel v0.0.0-20260507153054-7d218c36141b/go.mod h1:WjPcCDq27OZxGzemgEOGQ4YYVrnO7ogFvrTNl2BDkr0=
+github.com/fastygo/ui8kit v0.4.0 h1:nvng23c9WIkQS2RiEBA7t9CXxxgohiqgGf+dcODQsxk=
+github.com/fastygo/ui8kit v0.4.0/go.mod h1:x/dtiyMHkubzZOoFd4FovZuAnhMzNljTBygUiVXwnvM=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=

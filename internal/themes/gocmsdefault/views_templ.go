@@ -90,10 +90,7 @@ func ThemePage(data publicrender.PublicPage) templ.Component {
 				SwitchToDarkLabel:  data.Layout.ThemeToggle.SwitchToDarkLabel,
 				SwitchToLightLabel: data.Layout.ThemeToggle.SwitchToLightLabel,
 			},
-			MarketingShell:     true,
-			HeaderLogoURL:      "/static/img/gocms-logo.png",
-			HeaderLogoHomeHref: "/",
-			HeaderLogoAlt:      publicHeaderLogoAlt(data.Layout.Brand),
+			MarketingShell: true,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -131,7 +128,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templpkg.SafeURL(data.SEO.CanonicalURL))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 44, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 41, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -150,7 +147,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 47, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 44, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -174,7 +171,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(ogType(data.SEO.Type))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 52, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 49, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -192,7 +189,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 54, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 51, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -211,7 +208,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 57, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 54, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -230,7 +227,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.CanonicalURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 60, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 57, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -249,7 +246,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.ImageURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 63, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 60, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -268,7 +265,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.PublishedAt)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 66, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 63, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -287,7 +284,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(data.SEO.ModifiedAt)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 69, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 66, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -306,7 +303,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var13 templ.SafeURL
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templpkg.SafeURL(stylesheet))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 72, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 69, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -325,7 +322,7 @@ func themeHead(data publicrender.PublicPage) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(templpkg.SafeURL(script))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 75, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/themes/gocmsdefault/views.templ`, Line: 72, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -2135,13 +2132,6 @@ func ifText(content string) templ.Component {
 		}
 		return nil
 	})
-}
-
-func publicHeaderLogoAlt(brand string) string {
-	if strings.TrimSpace(brand) != "" {
-		return brand
-	}
-	return "GoCMS"
 }
 
 func archiveSlice(items []publicrender.ArchiveItem, start, end int) []publicrender.ArchiveItem {

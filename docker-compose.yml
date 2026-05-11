@@ -1,0 +1,22 @@
+services:
+  cms:
+    build:
+      context: .
+    image: fastygo/cms:local
+    container_name: fastygo-cms
+    restart: unless-stopped
+    environment:
+      APP_BIND: 0.0.0.0:8080
+      APP_DATA_SOURCE: file:/data/gocms.db
+      APP_SESSION_KEY: ${APP_SESSION_KEY:-gocms-development-session-key-change-me}
+      GOCMS_PRESET: full
+      GOCMS_STORAGE_PROFILE: sqlite
+      GOCMS_DEPLOYMENT_PROFILE: container
+      GOCMS_SEED_FIXTURES: ${GOCMS_SEED_FIXTURES:-true}
+    ports:
+      - "127.0.0.1:18055:8080"
+    volumes:
+      - gocms-data:/data
+
+volumes:
+  gocms-data:
