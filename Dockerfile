@@ -12,10 +12,13 @@ WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci
 
+FROM oven/bun:1-debian AS bun-runtime
+
 FROM go-base AS generated
 
 COPY . .
 COPY --from=node-deps /src/node_modules ./node_modules
+COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 RUN go tool templ generate ./... \
     && go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static
 
