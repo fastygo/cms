@@ -1,27 +1,9 @@
 services:
-  data-permissions:
-    image: busybox:1.36
-    container_name: fastygo-cms-data-permissions
-    restart: "no"
-    user: "0:0"
-    command:
-      - sh
-      - -c
-      - >
-        mkdir -p /data
-        && chown -R ${GOCMS_DATA_UID:-65532}:${GOCMS_DATA_GID:-65532} /data
-        && chmod u+rwX /data
-    volumes:
-      - ${GOCMS_DATA_DIR:-./data}:/data
-
   cms:
     build:
       context: .
     image: fastygo/cms:local
     container_name: fastygo-cms
-    depends_on:
-      data-permissions:
-        condition: service_completed_successfully
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

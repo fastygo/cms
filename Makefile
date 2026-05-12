@@ -1,6 +1,8 @@
 .PHONY: run test fmt build verify docker-build compose-config kics prepare-data deploy docker-ps docker-logs docker-stop
 
 GOCMS_DATA_DIR ?= ./data
+GOCMS_DATA_UID ?= 65532
+GOCMS_DATA_GID ?= 65532
 
 run:
 	go run ./cmd/server
@@ -39,15 +41,18 @@ kics:
 		-p /scan/docker-compose.yml \
 		-o /out \
 		--report-formats sarif,json \
-		--silent \
+		--minimal-ui \
+		--no-progress \
 		--disable-full-descriptions \
 		--fail-on critical,high,medium,low,info
 
 prepare-data:
 	mkdir -p "$(GOCMS_DATA_DIR)"
+	docker run --rm \
+		-v "$(abspath $(GOCMS_DATA_DIR)):/data" \
+		busybox:1.36 sh -c 'chown -R $(GOCMS_DATA_UID):$(GOCMS_DATA_GID) /data && chmod u+rwX /data'
 
 deploy: prepare-data
-	docker compose up --force-recreate --no-deps data-permissions
 	docker compose up -d --build cms
 
 docker-ps:

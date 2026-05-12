@@ -123,7 +123,7 @@ The same pipeline runs in GitHub Actions and inside the multi-stage **Docker** b
 
 The default [`docker-compose.yml`](../docker-compose.yml) binds SQLite data to **`./data`** on the host (`GOCMS_DATA_DIR` overrides the host path). The runtime image uses the distroless **non-root** user (**UID/GID 65532**).
 
-`make deploy` creates the host data directory, force-runs the one-shot **`data-permissions`** service, then starts `cms`. The helper mounts the same data path and applies:
+`make deploy` creates the host data directory, runs a one-shot **BusyBox** container to fix bind-mount permissions, then starts `cms`. The helper is intentionally kept out of `docker-compose.yml` so IaC scanners only evaluate the long-running application service. It mounts the same data path and applies:
 
 ```bash
 chown -R ${GOCMS_DATA_UID:-65532}:${GOCMS_DATA_GID:-65532} /data
