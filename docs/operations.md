@@ -115,7 +115,7 @@ bun install --frozen-lockfile
 bun run verify
 ```
 
-The same pipeline runs in GitHub Actions and inside the multi-stage **Docker** build (Tailwind, esbuild, UI8Kit `sync-assets`, pinned **ui8px** lint, then `go test` when you run `make verify`).
+The same pipeline runs in GitHub Actions and inside the multi-stage **Docker** build (Tailwind, esbuild, UI8Kit `sync-assets`, **`append-gocms-locale-sync`** so public locale SPA updates header/footer menus, pinned **ui8px** lint, then `go test` when you run `make verify`).
 
 ---
 

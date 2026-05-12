@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "bun@1.3.3",
   "scripts": {
-    "vendor:assets": "go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static",
+    "vendor:assets": "go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static && bun ./scripts/append-gocms-locale-sync.mjs",
     "dev:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --watch",
     "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/app.css --minify",
     "build:editor": "esbuild ./web/src/admin-editor.js --bundle --format=iife --platform=browser --target=es2020 --minify --outfile=./web/static/js/admin-editor.js",

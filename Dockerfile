@@ -18,7 +18,8 @@ COPY . .
 COPY --from=bun-deps /src/node_modules ./node_modules
 COPY --from=bun-deps /usr/local/bin/bun /usr/local/bin/bun
 RUN go tool templ generate ./... \
-    && go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static
+    && go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static \
+    && bun ./scripts/append-gocms-locale-sync.mjs
 
 FROM oven/bun:1-debian AS assets
 
