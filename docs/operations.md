@@ -123,10 +123,14 @@ The same pipeline runs in GitHub Actions and inside the multi-stage **Docker** b
 
 The default [`docker-compose.yml`](../docker-compose.yml) binds SQLite data to **`./data`** on the host (`GOCMS_DATA_DIR` overrides the host path). The runtime image uses the distroless **non-root** user (**UID/GID 65532**).
 
-Before the first `docker compose up` on a server:
+`make deploy` creates the host data directory, force-runs the one-shot **`data-permissions`** service, then starts `cms`. The helper mounts the same data path and applies:
 
-1. Create the data directory: `mkdir -p ./data` (or your `GOCMS_DATA_DIR`).
-2. Ensure the container user can write the database file: `sudo chown -R 65532:65532 ./data`.
+```bash
+chown -R ${GOCMS_DATA_UID:-65532}:${GOCMS_DATA_GID:-65532} /data
+chmod u+rwX /data
+```
+
+This prevents SQLite startup failures such as **`unable to open database file (14)`** when `./data` was created as `root:root`. Override `GOCMS_DATA_UID` / `GOCMS_DATA_GID` only if you build a runtime image with a different container user.
 
 Set a strong **`APP_SESSION_KEY`** in production; do not rely on the development default.
 

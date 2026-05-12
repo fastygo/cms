@@ -1,4 +1,6 @@
-.PHONY: run test fmt build verify deploy docker-build compose-config kics docker-ps docker-logs docker-stop
+.PHONY: run test fmt build verify docker-build compose-config kics prepare-data deploy docker-ps docker-logs docker-stop
+
+GOCMS_DATA_DIR ?= ./data
 
 run:
 	go run ./cmd/server
@@ -41,8 +43,11 @@ kics:
 		--disable-full-descriptions \
 		--fail-on critical,high,medium,low,info
 
-deploy:
-	mkdir -p data
+prepare-data:
+	mkdir -p "$(GOCMS_DATA_DIR)"
+
+deploy: prepare-data
+	docker compose up --force-recreate --no-deps data-permissions
 	docker compose up -d --build cms
 
 docker-ps:

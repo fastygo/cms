@@ -6,6 +6,14 @@ function safeMenuLocationAttr(value) {
   return raw;
 }
 
+function syncSelectorInnerHTML(parsed, selector) {
+  var current = document.querySelector(selector);
+  var next = parsed.querySelector(selector);
+  if (current && next) {
+    current.innerHTML = next.innerHTML;
+  }
+}
+
 function syncLocaleMenuRegions(parsed) {
   var sections = document.querySelectorAll("[data-gocms-menu-location]");
   for (var i = 0; i < sections.length; i++) {
@@ -22,4 +30,8 @@ function syncLocaleMenuRegions(parsed) {
       el.innerHTML = sameInParsed[idx].innerHTML;
     }
   }
+
+  // UI8Kit Shell: mobile sheet and desktop sidebar use NavItems markup without data-gocms-* markers.
+  syncSelectorInnerHTML(parsed, ".ui-shell-mobile-sheet-panel .ui-shell-nav-mobile");
+  syncSelectorInnerHTML(parsed, ".ui-shell-desktop-aside .ui-shell-nav-desktop");
 }
