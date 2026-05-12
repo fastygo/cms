@@ -12,6 +12,6 @@
 @import "./ui8kit/shell.css";
 @import "./ui8kit/components.css";
 @import "./ui8kit/latty.css";
-@import "./ui8kit/prose.css";
+@import "./prose-fluid.css";
 @import "./admin.css";
 @import "./editor.css";
