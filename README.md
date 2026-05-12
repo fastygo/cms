@@ -58,7 +58,22 @@ Runtime profiles include:
 
 ## Getting Started
 
-Run locally:
+Prerequisites for full static builds and CI parity: **Go** (see `go.mod`), **Bun** (see `packageManager` in `package.json`), and optionally **Docker** / **Make**.
+
+Install JS dependencies and run the same checks as CI:
+
+```bash
+bun install --frozen-lockfile
+bun run verify
+```
+
+Or with Make (requires Bun on `PATH`):
+
+```bash
+make verify
+```
+
+Run locally without rebuilding assets:
 
 ```bash
 go run ./cmd/server

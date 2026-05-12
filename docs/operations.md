@@ -106,6 +106,19 @@ Details: [migrations.md](./migrations.md), [cms-capabilities.md](./cms-capabilit
 
 ---
 
+## Static assets and CI checks
+
+JavaScript tooling uses **Bun** (`bun.lock`, `packageManager` in `package.json`). To match CI locally:
+
+```bash
+bun install --frozen-lockfile
+bun run verify
+```
+
+The same pipeline runs in GitHub Actions and inside the multi-stage **Docker** build (Tailwind, esbuild, UI8Kit `sync-assets`, pinned **ui8px** lint, then `go test` when you run `make verify`).
+
+---
+
 ## Docker Compose (local and SSH hosts)
 
 The default [`docker-compose.yml`](../docker-compose.yml) binds SQLite data to **`./data`** on the host (`GOCMS_DATA_DIR` overrides the host path). The runtime image uses the distroless **non-root** user (**UID/GID 65532**).

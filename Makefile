@@ -11,14 +11,14 @@ fmt:
 
 build:
 	go tool templ generate ./...
-	npm run vendor:assets
-	npm run build:css
-	npm run build:versioned
+	bun run vendor:assets
+	bun run build:css
+	bun run build:versioned
 	go build ./cmd/server
 
 verify:
-	npm ci
-	npm run verify
+	bun install --frozen-lockfile
+	bun run verify
 
 docker-build:
 	docker build -t fastygo/cms:ci .

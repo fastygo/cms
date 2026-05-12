@@ -39,7 +39,7 @@ Completed:
 Pass 5 completion details:
 
 - [x] Hybrid theme foundation slice is complete: theme contract, built-in default theme, permalink settings/resolver, `Themes` and `Permalinks` admin screens, and `full`-mode public rendering foundation.
-- [x] Render checklist slice is complete: native installed themes (`gocms-default`, `blank`), public render contract/page assembler, blog/category-tag/author/search/content rendering, menus, media, breadcrumbs, SEO, admin activation, style preset selection, preview state, focused tests, and `npm run verify`.
+- [x] Render checklist slice is complete: native installed themes (`gocms-default`, `blank`), public render contract/page assembler, blog/category-tag/author/search/content rendering, menus, media, breadcrumbs, SEO, admin activation, style preset selection, preview state, focused tests, and `bun run verify`.
 - [x] Theme folders now keep compiled Go/templ logic and static asset conventions aligned at the theme/package level, while still separating code from `web/static` assets so styles can be changed through static files, tokens, and presets.
 - [x] Public frontend validation slice is complete: REST/GraphQL projections and the first compiled project/company theme package validate the structure needed for future marketplace-grade frontend work.
 
@@ -214,10 +214,10 @@ Exit criteria:
 
 Verification:
 
-- [x] `npm run verify` passes.
+- [x] `bun run verify` passes.
 - [x] `templ generate ./...` passes.
 - [x] UI architecture tests enforce no raw app `.templ` tags, import boundaries, `@apply` app CSS, and raw palette bans.
-- [x] `npx ui8px@latest lint ./... --ignore .manual .project` passes.
+- [x] `bun run lint:ui8px` (pinned `ui8px` in `package.json`) passes.
 - [x] `go test ./...` passes.
 
 Notes:
@@ -382,7 +382,7 @@ Checklist:
 - [x] Expose GraphQL plugin status/actions through existing admin and runtime surfaces.
 - [x] Add draft/private leakage tests.
 - [x] Add REST/GraphQL consistency tests for IDs, statuses, slugs, capability behavior, author data, media metadata visibility, and taxonomy assignments.
-- [x] Run focused package tests and `npm run verify`.
+- [x] Run focused package tests and `bun run verify`.
 
 Exit criteria:
 
@@ -394,7 +394,7 @@ Exit criteria:
 - [x] Draft leakage tests pass.
 - [x] Schema covers enough data for the validation frontend.
 - [x] `go test ./...` passes.
-- [x] `npm run verify` passes.
+- [x] `bun run verify` passes.
 
 ## Pass 5: Theme/Public API Foundation
 
@@ -430,7 +430,7 @@ Checklist:
 - [x] Add minimal public home, content detail, search/archive, and 404 rendering.
 - [x] Ensure public rendering uses application services and public-only data paths.
 - [x] Add focused route, capability, permalink, and leakage tests for the hybrid foundation slice.
-- [x] Run `npm run verify` after the hybrid foundation slice.
+- [x] Run `bun run verify` after the hybrid foundation slice.
 - [x] Add native installed theme packages: `gocms-default` and `blank`.
 - [x] Extend the theme registry to register native theme implementations, not only manifests.
 - [x] Add theme activation in admin for installed themes.

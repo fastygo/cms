@@ -5,30 +5,28 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-FROM node:22-bookworm AS node-deps
+FROM oven/bun:1-debian AS bun-deps
 
 WORKDIR /src
 
-COPY package.json package-lock.json ./
-RUN npm ci
-
-FROM oven/bun:1-debian AS bun-runtime
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 FROM go-base AS generated
 
 COPY . .
-COPY --from=node-deps /src/node_modules ./node_modules
-COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=bun-deps /src/node_modules ./node_modules
+COPY --from=bun-deps /usr/local/bin/bun /usr/local/bin/bun
 RUN go tool templ generate ./... \
     && go run github.com/fastygo/ui8kit/scripts/cmd/sync-assets web/static
 
-FROM node:22-bookworm AS assets
+FROM oven/bun:1-debian AS assets
 
 WORKDIR /src
 
 COPY --from=generated /src ./
-RUN npm run build:css \
-    && npm run build:versioned \
+RUN bun run build:css \
+    && bun run build:versioned \
     && rm -rf node_modules
 
 FROM go-base AS build
