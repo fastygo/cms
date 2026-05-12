@@ -1,5 +1,7 @@
 tmp/
 dist/
+data/
+kics-results/
 node_modules/
 .DS_Store
 .manual/

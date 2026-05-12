@@ -103,3 +103,18 @@ SQLite is the first full provider for this pass. Future MySQL/Postgres/Bolt adap
 - audit persistence
 
 Details: [migrations.md](./migrations.md), [cms-capabilities.md](./cms-capabilities.md).
+
+---
+
+## Docker Compose (local and SSH hosts)
+
+The default [`docker-compose.yml`](../docker-compose.yml) binds SQLite data to **`./data`** on the host (`GOCMS_DATA_DIR` overrides the host path). The runtime image uses the distroless **non-root** user (**UID/GID 65532**).
+
+Before the first `docker compose up` on a server:
+
+1. Create the data directory: `mkdir -p ./data` (or your `GOCMS_DATA_DIR`).
+2. Ensure the container user can write the database file: `sudo chown -R 65532:65532 ./data`.
+
+Set a strong **`APP_SESSION_KEY`** in production; do not rely on the development default.
+
+Docker **`HEALTHCHECK`** and Compose **`healthcheck`** call the **`/healthcheck`** helper, which requests **`/readyz`** inside the container (override with **`HEALTHCHECK_URL`** if needed).

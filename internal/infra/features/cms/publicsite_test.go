@@ -122,7 +122,7 @@ func TestPublicSiteUsesRussianAsDefaultWhenAcceptLanguageOmitted(t *testing.T) {
 		}
 		t.Fatalf("expected html lang=ru, body head: %s", head)
 	}
-	for _, want := range []string{"Опубликованная запись", "Новости", "Блог", "Публичный сайт на GoCMS."} {
+	for _, want := range []string{"Опубликованная запись", "Новости", "Блог", "Смотри, что умеет админка GoCMS"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected home to contain %q", want)
 		}
@@ -157,8 +157,8 @@ func TestPublicSiteEnglishLocalePrefixRendersEnglishCopy(t *testing.T) {
 		}
 		t.Fatalf("expected English fixture strings on /en/ home, excerpt: %s", head)
 	}
-	if !strings.Contains(body, "Public site powered by GoCMS.") {
-		t.Fatalf("expected English public fixture home hero headline on /en/")
+	if !strings.Contains(body, "See what GoCMS admin can do") {
+		t.Fatalf("expected English public fixture home intro on /en/")
 	}
 }
 

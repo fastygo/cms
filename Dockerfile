@@ -37,14 +37,17 @@ WORKDIR /src
 
 COPY --from=assets /src ./
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/gocms ./cmd/server \
-    && mkdir -p /out/data
+    && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/healthcheck ./cmd/healthcheck \
+    && mkdir -p /out/data \
+    && chown -R 65532:65532 /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 
 COPY --from=build /out/gocms /gocms
-COPY --from=build --chown=nonroot:nonroot /out/data /data
+COPY --from=build /out/healthcheck /healthcheck
+COPY --from=build /out/data /data
 COPY --from=assets /src/web/static /app/web/static
 
 ENV APP_BIND=0.0.0.0:8080
@@ -52,7 +55,13 @@ ENV APP_DATA_SOURCE=file:/data/gocms.db
 ENV GOCMS_PRESET=full
 ENV GOCMS_STORAGE_PROFILE=sqlite
 ENV GOCMS_DEPLOYMENT_PROFILE=container
+ENV HEALTHCHECK_URL=http://127.0.0.1:8080/readyz
 
 EXPOSE 8080
+
+USER nonroot:nonroot
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD ["/healthcheck"]
 
 ENTRYPOINT ["/gocms"]

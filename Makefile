@@ -1,4 +1,4 @@
-.PHONY: run test fmt build deploy docker-ps docker-logs docker-stop
+.PHONY: run test fmt build verify deploy docker-build compose-config kics docker-ps docker-logs docker-stop
 
 run:
 	go run ./cmd/server
@@ -16,7 +16,33 @@ build:
 	npm run build:versioned
 	go build ./cmd/server
 
+verify:
+	npm ci
+	npm run verify
+
+docker-build:
+	docker build -t fastygo/cms:ci .
+
+compose-config:
+	docker compose config
+
+kics:
+	mkdir -p kics-results
+	# On Docker Desktop for Windows, KICS may exit with "download not supported for scheme 'c'"; use WSL or rely on GitHub Actions.
+	docker run --rm \
+		-v "$(CURDIR):/scan:ro" \
+		-v "$(CURDIR)/kics-results:/out" \
+		checkmarx/kics:v2.1.20 scan \
+		-p /scan/Dockerfile \
+		-p /scan/docker-compose.yml \
+		-o /out \
+		--report-formats sarif,json \
+		--silent \
+		--disable-full-descriptions \
+		--fail-on critical,high,medium,low,info
+
 deploy:
+	mkdir -p data
 	docker compose up -d --build cms
 
 docker-ps:

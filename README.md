@@ -91,6 +91,15 @@ Format source:
 gofmt -w ./cmd ./internal
 ```
 
+## Docker
+
+Build and run with Compose (SQLite data under `./data`; see [Operations — Docker Compose](./docs/operations.md#docker-compose-local-and-ssh-hosts) for host permissions and session keys):
+
+```bash
+mkdir -p data
+docker compose up -d --build cms
+```
+
 ## Documentation Map
 
 - [CMS capability overview](./docs/cms-capabilities.md)

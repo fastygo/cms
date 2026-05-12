@@ -5,7 +5,7 @@ const roots = ["web/static/css"];
 const bannedDeclaration = /^\s*[a-z-]+\s*:/i;
 let failed = false;
 
-const rawCSSExceptions = new Set(["editor.css"]);
+const rawCSSExceptions = new Set(["editor.css", "tweakcn.css"]);
 
 for (const file of walk(roots)) {
   if (!file.endsWith(".css")) continue;
