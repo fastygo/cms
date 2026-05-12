@@ -543,13 +543,13 @@ func pageBody(data publicrender.PublicPage) templ.Component {
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = ui.Stack(ui.StackProps{Class: "gap-10"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var18), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Stack(ui.StackProps{Class: "min-w-0 w-full gap-10"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var18), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = ui.Container(ui.ContainerProps{Class: "py-12"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var17), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Container(ui.ContainerProps{Class: publicMainContainerClass(data.Kind)}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var17), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1227,7 +1227,7 @@ func featuredMedia(item *publicrender.MediaView) templ.Component {
 					templ_7745c5c3_Err = ui.Image(ui.ImageProps{
 						Src:   item.URL,
 						Alt:   item.AltText,
-						Class: "w-full rounded-lg border border-border",
+						Class: "block w-full max-w-full rounded-lg border border-border",
 					}).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -1237,20 +1237,24 @@ func featuredMedia(item *publicrender.MediaView) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					if item.Caption != "" {
-						templ_7745c5c3_Err = ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Caption).Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = ui.Text(ui.TextProps{
+							FontSize:  "sm",
+							TextColor: "muted-foreground",
+							TextAlign: "center",
+						}, item.Caption).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = ui.Stack(ui.StackProps{Class: "gap-2"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var41), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Stack(ui.StackProps{Class: "items-center gap-2"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var41), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = ui.Block(ui.BlockProps{Tag: "figure"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var40), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Block(ui.BlockProps{Tag: "figure", Class: "m-0 w-full"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var40), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1356,12 +1360,20 @@ func breadcrumbs(items []publicrender.Breadcrumb) templ.Component {
 					ctx = templ.InitializeContext(ctx)
 					for i, item := range items {
 						if item.URL != "" {
-							templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Href: item.URL, Variant: "link"}, item.Label).Render(ctx, templ_7745c5c3_Buffer)
+							templ_7745c5c3_Err = ui.Button(ui.ButtonProps{
+								Href:    item.URL,
+								Variant: "unstyled",
+								Class:   "min-w-0 max-w-full shrink whitespace-normal break-words text-left text-sm font-medium text-primary underline-offset-4 hover:underline",
+							}, item.Label).Render(ctx, templ_7745c5c3_Buffer)
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
 						} else {
-							templ_7745c5c3_Err = ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Label).Render(ctx, templ_7745c5c3_Buffer)
+							templ_7745c5c3_Err = ui.Text(ui.TextProps{
+								FontSize:  "sm",
+								TextColor: "muted-foreground",
+								Class:     "min-w-0 max-w-full shrink break-words",
+							}, item.Label).Render(ctx, templ_7745c5c3_Buffer)
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -1371,7 +1383,11 @@ func breadcrumbs(items []publicrender.Breadcrumb) templ.Component {
 							return templ_7745c5c3_Err
 						}
 						if i < len(items)-1 {
-							templ_7745c5c3_Err = ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "/").Render(ctx, templ_7745c5c3_Buffer)
+							templ_7745c5c3_Err = ui.Text(ui.TextProps{
+								FontSize:  "sm",
+								TextColor: "muted-foreground",
+								Class:     "shrink-0",
+							}, "/").Render(ctx, templ_7745c5c3_Buffer)
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -1379,14 +1395,14 @@ func breadcrumbs(items []publicrender.Breadcrumb) templ.Component {
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = ui.Group(ui.GroupProps{Class: "flex-wrap gap-2"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var46), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Group(ui.GroupProps{Class: "flex-wrap items-start gap-2 min-w-0 max-w-full"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var46), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
 			templ_7745c5c3_Err = elements.MarkerSection(elements.MarkerProps{
-				Class: "gocms-public-breadcrumbs",
+				Class: "gocms-public-breadcrumbs min-w-0 w-full",
 				Attrs: templpkg.Attributes{"data-gocms-breadcrumbs": "public"},
 			}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var45), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
@@ -1561,6 +1577,14 @@ func pagination(data publicrender.Pagination) templ.Component {
 		}
 		return nil
 	})
+}
+
+func publicMainContainerClass(kind publicrender.RenderKind) string {
+	base := "px-4 py-12 sm:px-6"
+	if kind == publicrender.RenderKindPost {
+		return base + " !max-w-[960px]"
+	}
+	return base
 }
 
 func ogType(value string) string {

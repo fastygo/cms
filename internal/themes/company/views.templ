@@ -103,8 +103,8 @@ templ pageBody(data publicrender.PublicPage) {
 			"data-gocms-theme-package": "company",
 		},
 	}) {
-		@ui.Container(ui.ContainerProps{Class: "py-12"}) {
-			@ui.Stack(ui.StackProps{Class: "gap-10"}) {
+		@ui.Container(ui.ContainerProps{Class: publicMainContainerClass(data.Kind)}) {
+			@ui.Stack(ui.StackProps{Class: "min-w-0 w-full gap-10"}) {
 				@breadcrumbs(data.Breadcrumbs)
 				@companyHero(data)
 				switch data.Kind {
@@ -237,15 +237,19 @@ templ relatedItems(data publicrender.PublicPage) {
 
 templ featuredMedia(item *publicrender.MediaView) {
 	if item != nil && item.URL != "" {
-		@ui.Block(ui.BlockProps{Tag: "figure"}) {
-			@ui.Stack(ui.StackProps{Class: "gap-2"}) {
+		@ui.Block(ui.BlockProps{Tag: "figure", Class: "m-0 w-full"}) {
+			@ui.Stack(ui.StackProps{Class: "items-center gap-2"}) {
 				@ui.Image(ui.ImageProps{
 					Src:   item.URL,
 					Alt:   item.AltText,
-					Class: "w-full rounded-lg border border-border",
+					Class: "block w-full max-w-full rounded-lg border border-border",
 				})
 				if item.Caption != "" {
-					@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Caption)
+					@ui.Text(ui.TextProps{
+						FontSize:   "sm",
+						TextColor:  "muted-foreground",
+						TextAlign:  "center",
+					}, item.Caption)
 				}
 			}
 		}
@@ -263,18 +267,30 @@ templ contentBlock(content string) {
 templ breadcrumbs(items []publicrender.Breadcrumb) {
 	if len(items) > 0 {
 		@elements.MarkerSection(elements.MarkerProps{
-			Class: "gocms-public-breadcrumbs",
+			Class: "gocms-public-breadcrumbs min-w-0 w-full",
 			Attrs: templpkg.Attributes{"data-gocms-breadcrumbs": "public"},
 		}) {
-			@ui.Group(ui.GroupProps{Class: "flex-wrap gap-2"}) {
+			@ui.Group(ui.GroupProps{Class: "flex-wrap items-start gap-2 min-w-0 max-w-full"}) {
 				for i, item := range items {
 					if item.URL != "" {
-						@ui.Button(ui.ButtonProps{Href: item.URL, Variant: "link"}, item.Label)
+						@ui.Button(ui.ButtonProps{
+							Href:    item.URL,
+							Variant: "unstyled",
+							Class:   "min-w-0 max-w-full shrink whitespace-normal break-words text-left text-sm font-medium text-primary underline-offset-4 hover:underline",
+						}, item.Label)
 					} else {
-						@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, item.Label)
+						@ui.Text(ui.TextProps{
+							FontSize:  "sm",
+							TextColor: "muted-foreground",
+							Class:     "min-w-0 max-w-full shrink break-words",
+						}, item.Label)
 					}
 					if i < len(items)-1 {
-						@ui.Text(ui.TextProps{FontSize: "sm", TextColor: "muted-foreground"}, "/")
+						@ui.Text(ui.TextProps{
+							FontSize:  "sm",
+							TextColor: "muted-foreground",
+							Class:     "shrink-0",
+						}, "/")
 					}
 				}
 			}
@@ -317,6 +333,14 @@ templ pagination(data publicrender.Pagination) {
 			NextLabel:     data.NextLabel,
 		})
 	}
+}
+
+func publicMainContainerClass(kind publicrender.RenderKind) string {
+	base := "px-4 py-12 sm:px-6"
+	if kind == publicrender.RenderKindPost {
+		return base + " !max-w-[960px]"
+	}
+	return base
 }
 
 func ogType(value string) string {
