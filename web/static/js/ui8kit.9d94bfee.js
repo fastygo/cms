@@ -20,6 +20,36 @@
     return parser.parseFromString(html, "text/html");
   }
 
+  function safeMenuLocationAttr(value) {
+    var raw = String(value || "").trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(raw)) {
+      return "";
+    }
+    return raw;
+  }
+
+  /**
+   * Public shell menus are outside <main>. After SPA locale fetch, sync any
+   * [data-gocms-menu-location] sections from the fetched document (header, footer, etc.).
+   */
+  function syncLocaleMenuRegions(parsed) {
+    var sections = document.querySelectorAll("[data-gocms-menu-location]");
+    for (var i = 0; i < sections.length; i++) {
+      var el = sections[i];
+      var loc = safeMenuLocationAttr(el.getAttribute("data-gocms-menu-location"));
+      if (!loc) {
+        continue;
+      }
+      var selector = '[data-gocms-menu-location="' + loc + '"]';
+      var sameInDoc = document.querySelectorAll(selector);
+      var sameInParsed = parsed.querySelectorAll(selector);
+      var idx = Array.prototype.indexOf.call(sameInDoc, el);
+      if (idx >= 0 && idx < sameInParsed.length) {
+        el.innerHTML = sameInParsed[idx].innerHTML;
+      }
+    }
+  }
+
   function replaceMainContent(button, html) {
     var targetSelector = button.getAttribute("data-spa-target") || "main";
     var parsed = parseResponse(html);
@@ -29,6 +59,8 @@
     if (currentTarget && nextTarget) {
       currentTarget.innerHTML = nextTarget.innerHTML;
     }
+
+    syncLocaleMenuRegions(parsed);
 
     var parsedTitle = parsed.querySelector("title");
     if (parsedTitle && parsedTitle.textContent) {

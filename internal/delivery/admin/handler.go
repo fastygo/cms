@@ -458,7 +458,7 @@ func (h Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 		message := fixture.Login.ErrorInvalidCredentials
 		if errors.Is(err, appauthn.ErrLoginLocked) {
-			message = "Too many login attempts. Try again later."
+			message = fixture.Label("error_login_locked", "Too many login attempts. Try again later.")
 		}
 		data := views.LoginPageData{
 			Title:         fixture.Login.Title,
@@ -1067,6 +1067,7 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 		http.Error(w, "Invalid action token.", http.StatusForbidden)
 		return
 	}
+	fixture := h.fixture(r)
 	if bulkAction := strings.TrimSpace(r.PostForm.Get("bulk_action")); bulkAction != "" {
 		ids := listui.SelectedIDs(r)
 		status := strings.TrimSpace(strings.TrimPrefix(bulkAction, "status:"))
@@ -1097,14 +1098,14 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 			return
 		}
 		if !ok {
-			http.Error(w, "User not found.", http.StatusNotFound)
+			http.Error(w, fixture.Label("error_user_not_found", "User not found."), http.StatusNotFound)
 			return
 		}
 		switch securityAction {
 		case "set_password":
 			password := strings.TrimSpace(r.PostForm.Get("new_password"))
 			if password == "" {
-				http.Error(w, "New password is required.", http.StatusBadRequest)
+				http.Error(w, fixture.Label("error_new_password_required", "New password is required."), http.StatusBadRequest)
 				return
 			}
 			updated, err := h.authn.SetPassword(r.Context(), current.ID, password, r.PostForm.Get("must_change_password") != "")
@@ -1114,7 +1115,10 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 				return
 			}
 			h.audit(r, principal, "auth.password.set", "user", string(updated.ID), domainaudit.StatusSuccess, nil)
-			h.renderSecurityResult(w, r, principal, "Password updated", "The local password was rotated successfully.", []blocks.SimpleListRow{{Label: string(updated.ID), Description: "Password updated for local sign-in.", Status: visibleStatus(updated.MustChangePassword)}})
+			h.renderSecurityResult(w, r, principal,
+				fixture.Label("security_password_updated_title", "Password updated"),
+				fixture.Label("security_password_updated_description", "The local password was rotated successfully."),
+				[]blocks.SimpleListRow{{Label: string(updated.ID), Description: fixture.Label("security_password_updated_row_description", "Password updated for local sign-in."), Status: visibleStatus(updated.MustChangePassword)}})
 			return
 		case "generate_recovery_codes":
 			codes, err := h.authn.CreateRecoveryCodes(r.Context(), current.ID, max(parseFormInt(r, "recovery_code_count"), 1))
@@ -1125,10 +1129,12 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 			}
 			rows := make([]blocks.SimpleListRow, 0, len(codes))
 			for i, code := range codes {
-				rows = append(rows, blocks.SimpleListRow{ID: strconv.Itoa(i + 1), Label: "Recovery code", Description: code, Status: "copy-now"})
+				rows = append(rows, blocks.SimpleListRow{ID: strconv.Itoa(i + 1), Label: fixture.Label("security_recovery_code_row_label", "Recovery code"), Description: code, Status: "copy-now"})
 			}
 			h.audit(r, principal, "auth.recovery_codes.generate", "user", string(current.ID), domainaudit.StatusSuccess, map[string]any{"count": len(codes)})
-			h.renderSecurityResult(w, r, principal, "Recovery codes", "These codes are shown once. Copy them to offline storage now.", rows)
+			h.renderSecurityResult(w, r, principal,
+				fixture.Label("security_recovery_codes_title", "Recovery codes"),
+				fixture.Label("security_recovery_codes_description", "These codes are shown once. Copy them to offline storage now."), rows)
 			return
 		case "issue_reset_token":
 			raw, token, err := h.authn.CreateResetToken(r.Context(), principal.ID, current.ID, r.PostForm.Get("reset_token_label"), time.Duration(max(parseFormInt(r, "reset_token_ttl_minutes"), 1))*time.Minute, false, false)
@@ -1138,10 +1144,13 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 				return
 			}
 			h.audit(r, principal, "auth.reset_token.issue", "user", string(current.ID), domainaudit.StatusSuccess, map[string]any{"expires_at": token.ExpiresAt.UTC().Format(time.RFC3339)})
-			h.renderSecurityResult(w, r, principal, "Reset token", "This reset token is shown once. Deliver it over a trusted local/admin channel.", []blocks.SimpleListRow{
-				{Label: "Token", Description: raw, Status: "copy-now"},
-				{Label: "Expires", Description: token.ExpiresAt.UTC().Format(time.RFC3339), Status: "timed"},
-			})
+			h.renderSecurityResult(w, r, principal,
+				fixture.Label("security_reset_token_title", "Reset token"),
+				fixture.Label("security_reset_token_description", "This reset token is shown once. Deliver it over a trusted local/admin channel."),
+				[]blocks.SimpleListRow{
+					{Label: fixture.Label("security_token_label", "Token"), Description: raw, Status: "copy-now"},
+					{Label: fixture.Label("security_expires_label", "Expires"), Description: token.ExpiresAt.UTC().Format(time.RFC3339), Status: "timed"},
+				})
 			return
 		case "create_app_token":
 			raw, token, err := h.authn.CreateAppToken(r.Context(), current.ID, r.PostForm.Get("app_token_name"), parseCapabilities(r.PostForm.Get("app_token_capabilities")), time.Duration(max(parseFormInt(r, "app_token_ttl_hours"), 1))*time.Hour)
@@ -1150,7 +1159,7 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			description := "Inherited user capabilities."
+			description := fixture.Label("error_app_token_inherited_capabilities", "Inherited user capabilities.")
 			if len(token.Capabilities) > 0 {
 				parts := make([]string, 0, len(token.Capabilities))
 				for _, capability := range token.Capabilities {
@@ -1159,10 +1168,13 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 				description = strings.Join(parts, ", ")
 			}
 			h.audit(r, principal, "auth.app_token.create", "user", string(current.ID), domainaudit.StatusSuccess, map[string]any{"token_name": token.Name})
-			h.renderSecurityResult(w, r, principal, "App token", "This app token is shown once. Copy it to the client now.", []blocks.SimpleListRow{
-				{Label: "Token", Description: raw, Status: "copy-now"},
-				{Label: "Scope", Description: description, Status: "granted"},
-			})
+			h.renderSecurityResult(w, r, principal,
+				fixture.Label("security_app_token_title", "App token"),
+				fixture.Label("security_app_token_description", "This app token is shown once. Copy it to the client now."),
+				[]blocks.SimpleListRow{
+					{Label: fixture.Label("security_token_label", "Token"), Description: raw, Status: "copy-now"},
+					{Label: fixture.Label("security_app_token_scope_label", "Scope"), Description: description, Status: "granted"},
+				})
 			return
 		case "revoke_app_token":
 			if err := h.authn.RevokeAppToken(r.Context(), strings.TrimSpace(r.PostForm.Get("app_token_id"))); err != nil {
@@ -1171,10 +1183,13 @@ func (h Handler) userSave(w http.ResponseWriter, r *http.Request, principal auth
 				return
 			}
 			h.audit(r, principal, "auth.app_token.revoke", "user", string(current.ID), domainaudit.StatusSuccess, nil)
-			h.renderSecurityResult(w, r, principal, "App token revoked", "The selected app token was revoked.", []blocks.SimpleListRow{{Label: string(current.ID), Description: strings.TrimSpace(r.PostForm.Get("app_token_id")), Status: "revoked"}})
+			h.renderSecurityResult(w, r, principal,
+				fixture.Label("security_app_token_revoked_title", "App token revoked"),
+				fixture.Label("security_app_token_revoked_description", "The selected app token was revoked."),
+				[]blocks.SimpleListRow{{Label: string(current.ID), Description: strings.TrimSpace(r.PostForm.Get("app_token_id")), Status: "revoked"}})
 			return
 		default:
-			http.Error(w, "Unsupported security action.", http.StatusBadRequest)
+			http.Error(w, fixture.Label("error_unsupported_security_action", "Unsupported security action."), http.StatusBadRequest)
 			return
 		}
 	}
@@ -1400,8 +1415,8 @@ func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal 
 		graphqlDescription = fixture.Label("headless_graphql_enabled_description", "/go-graphql is enabled through the graphql plugin.")
 	}
 	rows := []blocks.SimpleListRow{
-		{Label: fixture.Label("headless_rest", "REST"), Description: fixture.Label("headless_rest_description", "/go-json/go/v2/ is enabled"), Status: "enabled"},
-		{Label: fixture.Label("headless_graphql", "GraphQL"), Description: graphqlDescription, Status: graphqlStatus},
+		{Label: fixture.Label("headless_rest", "REST endpoint"), Description: fixture.Label("headless_rest_description", "/go-json/go/v2/ is enabled"), Status: "enabled"},
+		{Label: fixture.Label("headless_graphql", "GraphQL endpoint"), Description: graphqlDescription, Status: graphqlStatus},
 		{Label: fixture.Label("headless_rendering", "Public rendering"), Description: fixture.Label("headless_rendering_description", "Can remain disabled for headless mode"), Status: "disabled"},
 	}
 	h.renderSimple(w, r, principal, "headless", fixture, rows, "headless-settings", nil, "", nil, nil)
@@ -1410,7 +1425,7 @@ func (h Handler) headlessPage(w http.ResponseWriter, r *http.Request, principal 
 func (h Handler) runtimePage(w http.ResponseWriter, r *http.Request, principal authz.Principal) {
 	fixture := h.fixture(r)
 	info := h.runtimeInfo
-	switchRule := fallbackValue(info.ProviderSwitchRule, "Durable provider switches require export, migration, restart or redeploy, and import through the JSON/site-package handoff. They are not runtime toggles.")
+	switchRule := fallbackValue(info.ProviderSwitchRule, fixture.Label("runtime_provider_switch_description", "Durable provider switches require export, migration, restart or redeploy, and import through the JSON/site-package handoff. They are not runtime toggles."))
 	rows := []blocks.SimpleListRow{
 		{Label: fixture.Label("runtime_preset", "Preset"), Description: valueOrUnset(info.Preset), Status: "resolved"},
 		{Label: fixture.Label("runtime_profile", "Runtime profile"), Description: valueOrUnset(info.RuntimeProfile), Status: "resolved"},
@@ -1433,7 +1448,7 @@ func (h Handler) runtimePage(w http.ResponseWriter, r *http.Request, principal a
 		}
 		rows = append(rows, blocks.SimpleListRow{
 			ID:          result.ID,
-			Label:       "Health: " + result.Label,
+			Label:       fmt.Sprintf("%s: %s", fixture.Label("runtime_row_health", "Health"), result.Label),
 			Description: description,
 			Status:      result.Status,
 		})
@@ -1442,7 +1457,7 @@ func (h Handler) runtimePage(w http.ResponseWriter, r *http.Request, principal a
 		for _, event := range events {
 			rows = append(rows, blocks.SimpleListRow{
 				ID:          event.ID,
-				Label:       "Audit: " + event.Action,
+				Label:       fmt.Sprintf("%s: %s", fixture.Label("runtime_row_audit", "Audit"), event.Action),
 				Description: strings.TrimSpace(strings.Join([]string{event.ActorID, event.Resource, event.ResourceID}, " | ")),
 				Status:      string(event.Status),
 			})
@@ -1452,7 +1467,7 @@ func (h Handler) runtimePage(w http.ResponseWriter, r *http.Request, principal a
 		for _, item := range errors {
 			rows = append(rows, blocks.SimpleListRow{
 				ID:          item.ID,
-				Label:       "Error: " + item.Source,
+				Label:       fmt.Sprintf("%s: %s", fixture.Label("runtime_row_error", "Diagnostics"), item.Source),
 				Description: item.Message,
 				Status:      item.Severity,
 			})
@@ -1597,7 +1612,7 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 	resolvedAssets := assets.Resolve()
 	fixture := h.fixture(r)
 	language := view.BuildLanguageToggleFromContext(r.Context(),
-		view.WithLabel(fixture.Language.Label),
+		view.WithLabel(fixture.Label("language_switch_aria_label", "Switch language")),
 		view.WithCurrentLabel(fixture.Language.CurrentLabel),
 		view.WithNextLocale(fixture.Language.NextLocale),
 		view.WithNextLabel(fixture.Language.NextLabel),
@@ -1630,7 +1645,7 @@ func (h Handler) layout(r *http.Request, principal authz.Principal, title string
 }
 
 func (h Handler) contentEditor(ctx context.Context, bundle adminfixtures.AdminFixture, title string, description string, action string, token string, entry domaincontent.Entry) blocks.ContentEditorData {
-	editorProvider := h.activeEditorProvider(ctx)
+	editorProvider := h.activeEditorProvider(ctx, bundle)
 	resource, _ := cmspanel.ResourceByKind(entry.Kind)
 	schema := resource.Form
 	schema.Fields = append(schema.Fields, cmspanel.MetadataFields(h.metaDefinitions(entry.Kind))...)
@@ -2691,18 +2706,22 @@ func updateFieldValue(fields []blocks.FieldData, id string, value string) {
 	}
 }
 
-func (h Handler) activeEditorProvider(ctx context.Context) plugins.EditorProviderRegistration {
+func (h Handler) activeEditorProvider(ctx context.Context, bundle adminfixtures.AdminFixture) plugins.EditorProviderRegistration {
 	configured := h.settingValue(ctx, editorProviderSettingKey, defaultEditorProviderID)
 	provider, ok := h.registry.ResolveEditorProvider(configured)
-	if ok {
-		return provider
+	if !ok {
+		provider = plugins.EditorProviderRegistration{
+			ID:          defaultEditorProviderID,
+			Label:       bundle.Label("editor_provider_tiptap_basic_label", "TipTap (Basic)"),
+			Description: bundle.Label("editor_provider_tiptap_basic_description", "Built-in TipTap editor with starter formatting extensions and HTML storage."),
+			Priority:    0,
+		}
 	}
-	return plugins.EditorProviderRegistration{
-		ID:          defaultEditorProviderID,
-		Label:       "TipTap (Basic)",
-		Description: "Built-in TipTap editor with starter formatting extensions and HTML storage.",
-		Priority:    0,
+	if provider.ID == defaultEditorProviderID {
+		provider.Label = bundle.Label("editor_provider_tiptap_basic_label", provider.Label)
+		provider.Description = bundle.Label("editor_provider_tiptap_basic_description", provider.Description)
 	}
+	return provider
 }
 
 func themeRoles(manifest domainthemes.Manifest) []string {

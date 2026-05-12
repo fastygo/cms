@@ -407,7 +407,7 @@ func (a pageAssembler) layout(r *http.Request, config publicrender.SiteConfig, t
 			SwitchToLightLabel: adminFixture.Theme.SwitchToLightLabel,
 		},
 		Language: view.BuildLanguageToggleFromContext(r.Context(),
-			view.WithLabel(adminFixture.Language.Label),
+			view.WithLabel(adminFixture.Label("language_switch_aria_label", "Switch language")),
 			view.WithCurrentLabel(adminFixture.Language.CurrentLabel),
 			view.WithNextLocale(adminFixture.Language.NextLocale),
 			view.WithNextLabel(adminFixture.Language.NextLabel),
